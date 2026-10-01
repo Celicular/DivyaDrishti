@@ -27,6 +27,7 @@ npm run dev
 
 ## Documentation & Status
 
+- [Pitch Deck & Product Specification](./DIVYADRISHTI_PITCH_DECK.md)
 - [Development Progress & Roadmap](./UNDER_DEVELOPMENT.md)
 
 ## License
