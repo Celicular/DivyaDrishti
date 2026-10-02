@@ -56,9 +56,9 @@ services:
       - "9100"
       - --no-mmproj-offload
       - -c
-      - "8192"
+      - "4096"
       - -np
-      - "4"
+      - "2"
       - --cont-batching
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9100/health || exit 1"]
@@ -85,11 +85,13 @@ services:
       - REQUEST_TIMEOUT=${GEMMA_REQUEST_TIMEOUT:-300}
       - MAX_TOKENS=${GEMMA_MAX_TOKENS:-2048}
       - TEMPERATURE=${GEMMA_TEMPERATURE:-0.7}
-      - GEMMA_API_KEY_SECRET=${GEMMA_API_KEY_SECRET:-ddrishti_gemma_secret_hackathon_2026_cc6}
+      - GEMMA_API_KEY_SECRET=${GEMMA_API_KEY_SECRET:-}
       - GEMMA_API_KEY=${GEMMA_API_KEY:-}
+
       - PORT=13795
-      - MAX_PARALLEL_INFERENCES=4
+      - MAX_PARALLEL_INFERENCES=2
       - QUEUE_TIMEOUT=120
+
     depends_on:
       - llama
     healthcheck:

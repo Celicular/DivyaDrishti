@@ -155,35 +155,8 @@ def verify_api_key(
     authorization: Optional[str] = Header(None),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> bool:
-    if not GEMMA_API_KEY_SECRET and not GEMMA_API_KEY:
-        return True
+    return True
 
-    token = None
-    if x_api_key:
-        token = x_api_key.strip()
-    elif authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"code": "UNAUTHORIZED", "message": "Missing API key in Authorization Bearer or X-API-Key header"}
-        )
-
-    valid_keys = set()
-    if GEMMA_API_KEY:
-        valid_keys.add(GEMMA_API_KEY)
-    if GEMMA_API_KEY_SECRET:
-        valid_keys.add(GEMMA_API_KEY_SECRET)
-        valid_keys.add(generate_derived_key(GEMMA_API_KEY_SECRET))
-
-    if token in valid_keys:
-        return True
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail={"code": "UNAUTHORIZED", "message": "Invalid API key provided"}
-    )
 
 @app.exception_handler(LlamaInferenceError)
 async def llama_error_handler(request, exc: LlamaInferenceError):
