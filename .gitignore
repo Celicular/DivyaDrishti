@@ -26,12 +26,14 @@ dist-ssr
 # Environment files
 .env
 .env.*
+.env.local
 !.env.example
 
 # Temporary & build artifacts
 temp/
 temp
 .build/
+.vite/
 
 # Python & Databases
 *.db
@@ -39,9 +41,27 @@ temp
 *.sqlite3
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
 venv/
 .venv/
+env/
 backend/data/
+data/
+
+# Model checkpoints & weights
+*.gguf
+*.bin
+*.safetensors
+gemma/models/*/*.gguf
+!gemma/models/*/.gitkeep
+
+# Storage buckets & scratch test media
+backend/storage/buckets/*
+!backend/storage/buckets/.gitkeep
+storage/buckets/*
+!storage/buckets/.gitkeep
+test_image*.jpg
+test_image*.png
 
 
