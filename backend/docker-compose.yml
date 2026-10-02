@@ -59,10 +59,12 @@ services:
       - "9100"
       - --no-mmproj-offload
       - -c
-      - "4096"
+      - ${LLAMA_CTX_SIZE:-8192}
       - -np
-      - "2"
+      - ${MAX_PARALLEL_INFERENCES:-2}
       - --cont-batching
+      - --chat-template-kwargs
+      - '{"enable_thinking": false}'
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9100/health || exit 1"]
       interval: 15s

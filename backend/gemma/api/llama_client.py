@@ -1,7 +1,15 @@
+import re
 import json
 import base64
 from typing import Optional, Dict, Any, List, AsyncGenerator
 import httpx
+
+def strip_thinking_tags(text: str) -> str:
+    if not text:
+        return text
+    cleaned = re.sub(r"<(think|thought)>.*?</\1>", "", text, flags=re.DOTALL)
+    cleaned = re.sub(r"^(.*?)</(think|thought)>", "", cleaned, flags=re.DOTALL)
+    return cleaned.strip()
 
 try:
     from backend.gemma.api.config import (
@@ -49,13 +57,17 @@ async def chat_completion(
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
     response_format: Optional[Dict[str, Any]] = None,
-    return_raw: bool = False
+    return_raw: bool = False,
+    enable_thinking: bool = False
 ):
     payload: Dict[str, Any] = {
         "model": MODEL_NAME,
         "messages": messages,
         "temperature": temperature if temperature is not None else TEMPERATURE,
         "max_tokens": max_tokens if max_tokens is not None else MAX_TOKENS,
+        "chat_template_kwargs": {
+            "enable_thinking": enable_thinking
+        }
     }
     if response_format:
         payload["response_format"] = response_format
@@ -71,6 +83,8 @@ async def chat_completion(
             if not choices:
                 raise LlamaInferenceError("INFERENCE_ERROR", "No choices returned by inference engine.", 500)
             content = choices[0].get("message", {}).get("content", "")
+            if not enable_thinking:
+                content = strip_thinking_tags(content)
             if return_raw:
                 return content, data
             return content
@@ -86,13 +100,17 @@ async def chat_completion(
 async def chat_completion_stream(
     messages: List[Dict[str, Any]],
     temperature: Optional[float] = None,
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = None,
+    enable_thinking: bool = False
 ) -> AsyncGenerator[str, None]:
     payload: Dict[str, Any] = {
         "model": MODEL_NAME,
         "messages": messages,
         "temperature": temperature if temperature is not None else TEMPERATURE,
         "max_tokens": max_tokens if max_tokens is not None else MAX_TOKENS,
+        "chat_template_kwargs": {
+            "enable_thinking": enable_thinking
+        },
         "stream": True,
     }
     try:
@@ -134,7 +152,8 @@ async def vision_completion(
     message: str,
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
-    return_raw: bool = False
+    return_raw: bool = False,
+    enable_thinking: bool = False
 ):
     base64_str = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{base64_str}"
@@ -155,4 +174,10 @@ async def vision_completion(
             ]
         }
     ]
-    return await chat_completion(messages, temperature, max_tokens, return_raw=return_raw)
+    return await chat_completion(
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        return_raw=return_raw,
+        enable_thinking=enable_thinking
+    )

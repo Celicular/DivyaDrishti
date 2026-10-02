@@ -232,7 +232,8 @@ async def chat(req: ChatRequest):
             messages=messages,
             temperature=req.temperature,
             max_tokens=req.max_tokens,
-            response_format=req.response_format
+            response_format=req.response_format,
+            enable_thinking=req.enable_thinking
         )
 
         if req.response_format:
@@ -278,7 +279,8 @@ async def chat_stream(req: ChatStreamRequest):
             async for token in chat_completion_stream(
                 messages=messages,
                 temperature=req.temperature,
-                max_tokens=req.max_tokens
+                max_tokens=req.max_tokens,
+                enable_thinking=req.enable_thinking
             ):
                 chunk_data = json.dumps({"token": token})
                 yield f"data: {chunk_data}\n\n"
@@ -303,7 +305,8 @@ async def vision(
     image: UploadFile = File(...),
     message: str = Form(...),
     temperature: Optional[float] = Form(None),
-    max_tokens: Optional[int] = Form(None)
+    max_tokens: Optional[int] = Form(None),
+    enable_thinking: bool = Form(False)
 ):
     try:
         image_bytes = await image.read()
@@ -325,6 +328,7 @@ async def vision(
             message=message,
             temperature=temperature,
             max_tokens=max_tokens,
+            enable_thinking=enable_thinking,
             return_raw=True
         )
     return ApiResponse(response=content, raw_llama=raw_llama)
@@ -342,7 +346,8 @@ async def json_endpoint(req: JsonExtractionRequest):
             messages=messages,
             temperature=req.temperature,
             max_tokens=req.max_tokens,
-            response_format=response_format
+            response_format=response_format,
+            enable_thinking=req.enable_thinking
         )
     try:
         parsed = json.loads(content)

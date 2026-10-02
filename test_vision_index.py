@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import mimetypes
+import argparse
 from pathlib import Path
 import urllib.request
 import urllib.parse
@@ -196,9 +197,13 @@ def build_multipart_formdata(fields: dict, files: dict):
     return body, content_type
 
 def main():
+    parser = argparse.ArgumentParser(description="Test DRISHTI visual evidence extractor")
+    parser.add_argument("image", nargs="?", default="test_image.jpg", help="Path to image file")
+    parser.add_argument("--enable-thinking", action="store_true", help="Enable reasoning thinking tokens")
+    args = parser.parse_args()
+
     root_dir = Path(__file__).resolve().parent
-    image_arg = sys.argv[1] if len(sys.argv) > 1 else "test_image.jpg"
-    image_path = Path(image_arg)
+    image_path = Path(args.image)
 
     if not image_path.is_absolute():
         image_path = root_dir / image_path
@@ -211,7 +216,7 @@ def main():
             for c in candidates:
                 print(f"  - {c.name}")
         print("\nUsage:")
-        print("  python test_vision_index.py <path_to_image>")
+        print("  python test_vision_index.py [path_to_image] [--enable-thinking]")
         sys.exit(1)
 
     prompt = load_prompt()
@@ -226,10 +231,12 @@ def main():
 
     print(f"Target Image: {image_path.name} ({len(image_bytes):,} bytes, {mime_type})")
     print(f"Vision Endpoint: {api_url}")
+    print(f"Thinking Enabled: {args.enable_thinking}")
     print("Calling Gemma Vision model with DRISHTI visual evidence extractor prompt...")
 
     fields = {
-        "message": prompt
+        "message": prompt,
+        "enable_thinking": "true" if args.enable_thinking else "false"
     }
     files = {
         "image": (image_path.name, image_bytes, mime_type)
