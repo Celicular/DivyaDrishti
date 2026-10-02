@@ -2,12 +2,15 @@ import secrets
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Header, status, File, UploadFile, Form
+import httpx
+from fastapi import FastAPI, HTTPException, Header, status, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 
 try:
-    from backend.config import BUCKETS_DIR
+    from backend.config import BUCKETS_DIR, GEMMA_INTERNAL_URL
+
     from backend.database import (
         init_db,
         get_user_by_identity,
@@ -45,8 +48,9 @@ try:
     from backend.services.metadata_extractor import process_and_extract_metadata
     from backend.services.geocoder import reverse_geocode
 except ImportError:
-    from config import BUCKETS_DIR
+    from config import BUCKETS_DIR, GEMMA_INTERNAL_URL
     from database import (
+
         init_db,
         get_user_by_identity,
         get_user_by_id,
@@ -501,3 +505,47 @@ def reverse_geocode_endpoint(latitude: float, longitude: float):
         location_name=result.get("location_name"),
         display_name=result.get("display_name")
     )
+
+@app.api_route("/ai/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"], tags=["AI"])
+@app.api_route("/api/ai/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"], tags=["AI"])
+async def proxy_gemma(path: str, request: Request):
+    target_url = f"{GEMMA_INTERNAL_URL}/{path}"
+    headers = dict(request.headers)
+    headers.pop("host", None)
+    headers.pop("content-length", None)
+
+    body = await request.body()
+
+    client = httpx.AsyncClient(timeout=300.0)
+    try:
+        req = client.build_request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            params=request.query_params,
+            content=body
+        )
+        response = await client.send(req, stream=True)
+    except httpx.ConnectError:
+        await client.aclose()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": {"code": "MODEL_UNAVAILABLE", "message": "Gemma AI service is unreachable."}}
+        )
+    except Exception as exc:
+        await client.aclose()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "INFERENCE_ERROR", "message": str(exc)}}
+        )
+
+    excluded_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    resp_headers = {k: v for k, v in response.headers.items() if k.lower() not in excluded_headers}
+
+    return StreamingResponse(
+        response.aiter_raw(),
+        status_code=response.status_code,
+        headers=resp_headers,
+        background=client.aclose
+    )
+
