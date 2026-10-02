@@ -1156,7 +1156,7 @@ export default function Dashboard() {
                           <div className="media-gallery-grid">
                             {cat.items.map((item) => {
                               const overallIndex = sortedMedia.findIndex((m) => m.id === item.id)
-                              const isItemIndexed = item.is_ai_indexed || (overallIndex < mockIndexedCount)
+                              const isItemIndexed = Boolean(item.is_ai_indexed)
                               const meta = item.metadata || {}
                               const hasGps =
                                 meta.latitude !== null &&
