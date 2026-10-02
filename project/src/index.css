@@ -390,7 +390,7 @@ body:has(dialog[open]) { overflow: hidden; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .dashboard-shell { display: flex; min-height: 100vh; background: #f7f6f1; color: #292c29; font-family: var(--font-sans); }
-.dashboard-sidebar { width: 260px; background: #ffffff; border-right: 1px solid #e7e3da; display: flex; flex-direction: column; transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1); flex-shrink: 0; }
+.dashboard-sidebar { width: 260px; height: 100vh; max-height: 100vh; position: sticky; top: 0; align-self: flex-start; background: #ffffff; border-right: 1px solid #e7e3da; display: flex; flex-direction: column; transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1); flex-shrink: 0; z-index: 20; }
 .dashboard-shell.sidebar-collapsed .dashboard-sidebar { width: 74px; }
 .sidebar-top { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #ebe7df; }
 .sidebar-brand { display: flex; align-items: center; gap: 10px; overflow: hidden; }
@@ -400,7 +400,7 @@ body:has(dialog[open]) { overflow: hidden; }
 .brand-tag { font-size: 10px; color: #758076; letter-spacing: 0.02em; }
 .collapse-toggle-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid #dfdad0; background: #fbfaf7; display: grid; place-items: center; color: #5b655c; transition: all 0.15s; flex-shrink: 0; }
 .collapse-toggle-btn:hover { background: #ffffff; color: #292c29; border-color: #c8c2b5; }
-.sidebar-nav { flex: 1; padding: 18px 10px; display: flex; flex-direction: column; gap: 6px; }
+.sidebar-nav { flex: 1; padding: 18px 10px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
 .nav-item { display: flex; align-items: center; gap: 12px; width: 100%; height: 42px; padding: 0 12px; border-radius: 9px; border: 0; background: transparent; color: #525c53; font-size: 14px; font-weight: 500; transition: all 0.15s; cursor: pointer; white-space: nowrap; }
 .nav-item:hover { background: #f3f1ea; color: #252824; }
 .nav-item.is-active { background: #eaf5ee; color: #006b49; font-weight: 600; }
