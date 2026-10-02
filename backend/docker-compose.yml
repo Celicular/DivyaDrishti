@@ -39,11 +39,17 @@ services:
       - "9100"
     volumes:
       - gemma_models:/models
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - HF_HOME=/models
+      - HF_TOKEN=${HF_TOKEN:-}
     command:
-      - -m
-      - /models/gemma-4-e4b/model.gguf
-      - --mmproj
-      - /models/gemma-4-e4b/mmproj.gguf
+      - --hf-repo
+      - ${HF_REPO:-google/gemma-4-E4B-it-qat-q4_0-gguf}
+      - --hf-file
+      - ${HF_FILE:-gemma-4-E4B_q4_0-it.gguf}
       - --host
       - 0.0.0.0
       - --port
@@ -59,7 +65,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 300s
+
 
   gemma-api:
     build:

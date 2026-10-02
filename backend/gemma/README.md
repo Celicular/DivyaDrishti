@@ -24,27 +24,23 @@ gemma_models volume (/models/gemma-4-e4b)
 
 ## Setup & Model Download
 
-### 1. Download Weights
-Download the Q4 GGUF model and its multimodal projector from Hugging Face (`ggml-org/gemma-4-E4B-GGUF`):
+The service is configured to **automatically download** the Gemma 4 E4B INT4 model (`gemma-4-E4B_q4_0-it.gguf`) and its multimodal projector directly from Hugging Face on initial launch into the persistent `gemma_models` volume.
 
+### 1. Add Your Hugging Face Token in `.env`
+Because Google Gemma models are gated on Hugging Face:
+1. Accept the model license on Hugging Face: [google/gemma-4-E4B-it-qat-q4_0-gguf](https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf)
+2. Generate an Access Token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+3. Set your token in `.env`:
+   ```env
+   HF_TOKEN=hf_your_token_here
+   ```
+
+### 2. Start the Service
 ```bash
-# Place inside backend/gemma/models/gemma-4-e4b/
-mkdir -p backend/gemma/models/gemma-4-e4b
-cd backend/gemma/models/gemma-4-e4b
-
-# Download Q4 model and projector (example using curl or huggingface-cli)
-curl -L -o model.gguf "https://huggingface.co/ggml-org/gemma-4-E4B-GGUF/resolve/main/gemma-4-e4b-q4_k_m.gguf"
-curl -L -o mmproj.gguf "https://huggingface.co/ggml-org/gemma-4-E4B-GGUF/resolve/main/mmproj-gemma-4-e4b-f16.gguf"
+docker compose up -d
 ```
+On initial launch, `llama.cpp` will download the model weights directly into the persistent `gemma_models` volume. Once downloaded, the model is permanently cached and will start instantly on subsequent restarts.
 
-### 2. Copy Weights to Persistent Volume
-Once Docker Compose starts:
-
-```bash
-docker compose cp backend/gemma/models/gemma-4-e4b ddrishti-llama-server:/models/
-```
-
-The weights will remain persisted in the `gemma_models` Docker volume across all restarts and rebuilds.
 
 ## API Key Authentication
 
