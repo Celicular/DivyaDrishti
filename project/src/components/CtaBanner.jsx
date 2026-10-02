@@ -43,7 +43,7 @@ export default function CtaBanner() {
         <motion.h2 variants={itemVariants}>Ready to get started?</motion.h2>
         <motion.p variants={itemVariants}>See your field media in a whole new way. Explore the free prototype.</motion.p>
         <motion.a
-          href="#ask-evidence"
+          href="/login"
           className="button"
           variants={itemVariants}
           whileHover={{ scale: 1.05, y: -2 }}

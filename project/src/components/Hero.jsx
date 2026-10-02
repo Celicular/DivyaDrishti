@@ -80,7 +80,7 @@ export default function Hero() {
             </motion.p>
 
             <motion.a
-              href="#ask-evidence"
+              href="/login"
               className="button"
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -88,7 +88,7 @@ export default function Hero() {
               whileHover={{ scale: 1.04, y: -2 }}
               whileTap={{ scale: 0.98 }}
             >
-              Get DDrishti
+              Get DDrishti / Demo
             </motion.a>
           </div>
 

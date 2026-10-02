@@ -48,7 +48,7 @@ export default function FeatureCards() {
           <motion.a
             key={feature.kind}
             className={`feature-card feature-${feature.kind}`}
-            href="#ask-evidence"
+            href="/login"
             variants={cardVariants}
             whileHover={{
               y: -8,

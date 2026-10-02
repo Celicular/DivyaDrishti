@@ -65,8 +65,8 @@ npm install
 # Start local development server
 npm run dev
 
-# Build for production
-npm run build
+# Or start both backend and frontend automatically (Windows):
+.\run.bat
 ```
 
 ---

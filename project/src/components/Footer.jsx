@@ -11,7 +11,7 @@ export default function Footer({ onOpenDeck }) {
           </a>
 
           <nav className="footer-nav" aria-label="Footer links">
-            <a href="#ask-evidence">Evidence Studio</a>
+            <a href="/login">Evidence Studio</a>
             <a href="#how-it-works">How It Works</a>
             <a href="#integrations">Integrations</a>
             <button type="button" onClick={() => onOpenDeck()} className="footer-btn">

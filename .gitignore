@@ -33,3 +33,15 @@ temp/
 temp
 .build/
 
+# Python & Databases
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+*.py[cod]
+.pytest_cache/
+venv/
+.venv/
+backend/data/
+
+

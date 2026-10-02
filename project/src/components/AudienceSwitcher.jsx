@@ -68,7 +68,7 @@ export default function AudienceSwitcher() {
         </div>
 
         <motion.a
-          href="#ask-evidence"
+          href="/login"
           className="button"
           whileHover={{ scale: 1.04, y: -2 }}
           whileTap={{ scale: 0.98 }}

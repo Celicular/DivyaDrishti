@@ -1,0 +1,43 @@
+CREATE TABLE IF NOT EXISTS media_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    uid INTEGER NOT NULL,
+    file_name TEXT NOT NULL UNIQUE,
+    original_file_name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    is_grouped BOOLEAN NOT NULL DEFAULT 0,
+    image_url TEXT NOT NULL,
+    thumbnail_url TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    mime_type TEXT NOT NULL,
+    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    captured_at TIMESTAMP,
+    is_meta_indexed BOOLEAN NOT NULL DEFAULT 0,
+    is_ai_indexed BOOLEAN NOT NULL DEFAULT 0,
+    is_ai_generated BOOLEAN NOT NULL DEFAULT 0,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (uid) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS image_metadata (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_id INTEGER NOT NULL UNIQUE,
+    latitude REAL,
+    longitude REAL,
+    altitude REAL,
+    capture_datetime TEXT,
+    camera_make TEXT,
+    camera_model TEXT,
+    lens_model TEXT,
+    description TEXT,
+    creator TEXT,
+    organization TEXT,
+    width INTEGER,
+    height INTEGER,
+    software TEXT,
+    copyright TEXT,
+    unique_id TEXT,
+    c2pa_manifest_detected BOOLEAN NOT NULL DEFAULT 0,
+    raw_metadata_json TEXT,
+    FOREIGN KEY (image_id) REFERENCES media_assets(id) ON DELETE CASCADE
+);
