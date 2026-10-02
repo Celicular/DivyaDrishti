@@ -18,7 +18,10 @@ services:
       - DB_NAME=${DB_NAME:-ddrishti.db}
       - DB_DIR=${DB_DIR:-/app/data}
       - STORAGE_DIR=${STORAGE_DIR:-/app/storage}
-      - GEMMA_INTERNAL_URL=http://gemma-api:13795
+      - GEMMA_INTERNAL_URL=${GEMMA_INTERNAL_URL:-http://gemma-api:13795}
+      - USE_EXTERNAL_AI_API=${USE_EXTERNAL_AI_API:-false}
+      - EXTERNAL_AI_URL=${EXTERNAL_AI_URL:-https://ddapi.celi.me/ai}
+      - INTERNAL_AI_URL=${INTERNAL_AI_URL:-http://gemma-api:13795}
 
     volumes:
       - backend_data:/app/data

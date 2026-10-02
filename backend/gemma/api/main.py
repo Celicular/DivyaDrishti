@@ -319,14 +319,15 @@ async def vision(
     mime_type = image.content_type or "image/jpeg"
 
     async with acquire_inference_slot():
-        content = await vision_completion(
+        content, raw_llama = await vision_completion(
             image_bytes=image_bytes,
             mime_type=mime_type,
             message=message,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            return_raw=True
         )
-    return ApiResponse(response=content)
+    return ApiResponse(response=content, raw_llama=raw_llama)
 
 @app.post("/v1/json", response_model=ApiResponse, dependencies=[Depends(verify_api_key)])
 async def json_endpoint(req: JsonExtractionRequest):

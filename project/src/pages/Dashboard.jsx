@@ -46,6 +46,7 @@ import {
   reverseGeocode
 } from '../api/media'
 import Lightbox from '../components/Lightbox'
+import IndexingStatusBar from '../components/IndexingStatusBar'
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return ''
@@ -169,6 +170,58 @@ export default function Dashboard() {
   useEffect(() => {
     setSelectedImageIds([])
   }, [openFolderId, activeScreen])
+
+  const [mockIndexedCount, setMockIndexedCount] = useState(0)
+  const [isSimulatingIndexing, setIsSimulatingIndexing] = useState(false)
+
+  useEffect(() => {
+    if (projectMedia.length > 0) {
+      setMockIndexedCount((prev) => {
+        if (prev === 0) {
+          return Math.max(1, Math.min(projectMedia.length - 1, 2))
+        }
+        return Math.min(prev, projectMedia.length)
+      })
+    } else {
+      setMockIndexedCount(0)
+      setIsSimulatingIndexing(false)
+    }
+  }, [projectMedia])
+
+  useEffect(() => {
+    let timer
+    if (isSimulatingIndexing && projectMedia.length > 0) {
+      timer = setInterval(() => {
+        setMockIndexedCount((prev) => {
+          if (prev >= projectMedia.length) {
+            setIsSimulatingIndexing(false)
+            return projectMedia.length
+          }
+          const next = prev + 1
+          if (next >= projectMedia.length) {
+            setIsSimulatingIndexing(false)
+          }
+          return next
+        })
+      }, 900)
+    }
+    return () => clearInterval(timer)
+  }, [isSimulatingIndexing, projectMedia.length])
+
+  const handleSimulateToggle = () => {
+    if (mockIndexedCount >= projectMedia.length) {
+      setMockIndexedCount(0)
+      setIsSimulatingIndexing(true)
+    } else {
+      setMockIndexedCount(projectMedia.length)
+      setIsSimulatingIndexing(false)
+    }
+  }
+
+  const handleReindex = () => {
+    setMockIndexedCount(0)
+    setIsSimulatingIndexing(true)
+  }
 
   useEffect(() => {
     const token = getAuthToken()
@@ -953,7 +1006,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               ) : (
-                <div className="drive-folder-view">
+                <div className="drive-folder-view pb-16">
                   <div className="folder-navigation-header">
                     <div className="folder-breadcrumbs">
                       <button
@@ -1120,6 +1173,7 @@ export default function Dashboard() {
                           <div className="media-gallery-grid">
                             {cat.items.map((item) => {
                               const overallIndex = sortedMedia.findIndex((m) => m.id === item.id)
+                              const isItemIndexed = item.is_ai_indexed || (overallIndex < mockIndexedCount)
                               const meta = item.metadata || {}
                               const hasGps =
                                 meta.latitude !== null &&
@@ -1158,20 +1212,6 @@ export default function Dashboard() {
                                     >
                                       {isSelected ? <Check size={13} /> : null}
                                     </button>
-
-                                    <div className="media-overlay-badges">
-                                      {item.is_ai_generated ? (
-                                        <span className="badge-ai-pill" title="AI synthetic generation detected">
-                                          <AlertCircle size={11} /> AI
-                                        </span>
-                                      ) : null}
-
-                                      {item.is_grouped && (
-                                        <span className="badge-grouped-pill" title="Uploaded in batch group">
-                                          Grouped
-                                        </span>
-                                      )}
-                                    </div>
 
                                     <div className="media-hover-actions">
                                       <button
@@ -1212,7 +1252,12 @@ export default function Dashboard() {
                                   </div>
 
                                   <div className="media-info-body">
-                                    <h4 className="media-display-name truncate">{item.display_name}</h4>
+                                    <h4 className="media-display-name truncate flex items-center gap-1.5" title={item.display_name}>
+                                      {isItemIndexed && (
+                                        <Sparkles size={13} className="text-emerald-600 shrink-0" />
+                                      )}
+                                      <span className="truncate">{item.display_name}</span>
+                                    </h4>
                                     {hasGps && (
                                       <div
                                         className="media-location-tag truncate"
@@ -1238,6 +1283,14 @@ export default function Dashboard() {
                       ))}
                     </div>
                   )}
+
+                  <IndexingStatusBar
+                    totalImages={projectMedia.length}
+                    indexedCount={mockIndexedCount}
+                    isIndexing={isSimulatingIndexing}
+                    isCollapsed={isCollapsed}
+                    onSimulateToggle={handleSimulateToggle}
+                  />
                 </div>
               )}
             </div>
@@ -1405,7 +1458,10 @@ export default function Dashboard() {
 
       {lightboxIndex !== null && (
         <Lightbox
-          images={sortedMedia}
+          images={sortedMedia.map((m, idx) => ({
+            ...m,
+            is_ai_indexed: m.is_ai_indexed || (idx < mockIndexedCount)
+          }))}
           currentIndex={lightboxIndex}
           resolvedLocations={resolvedLocations}
           onClose={() => setLightboxIndex(null)}

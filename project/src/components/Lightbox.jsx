@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   FileBadge,
   Calendar,
-  Camera
+  Camera,
+  Sparkles
 } from 'lucide-react'
 import { getMediaUrl, reverseGeocode } from '../api/media'
 
@@ -199,6 +200,11 @@ export default function Lightbox({
             </div>
           ) : (
             <div className="flex items-center gap-2 min-w-0">
+              {currentImage.is_ai_indexed && (
+                <span title="Indexed with AI" className="text-emerald-600 inline-flex items-center shrink-0">
+                  <Sparkles size={16} className="text-emerald-600" />
+                </span>
+              )}
               <h2 className="text-sm md:text-base font-semibold text-[#252824] truncate max-w-sm md:max-w-lg">
                 {currentImage.display_name}
               </h2>
@@ -497,7 +503,12 @@ export default function Lightbox({
 
                 {meta.description && (
                   <div>
-                    <dt className="text-[#6d776e]">Embedded Description</dt>
+                    <dt className="text-[#6d776e] flex items-center gap-1.5">
+                      {currentImage.is_ai_indexed && (
+                        <Sparkles size={12} className="text-emerald-600 shrink-0" />
+                      )}
+                      <span>Embedded Description</span>
+                    </dt>
                     <dd className="font-medium text-[#252824] mt-0.5 italic">{meta.description}</dd>
                   </div>
                 )}

@@ -48,8 +48,9 @@ async def chat_completion(
     messages: List[Dict[str, Any]],
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
-    response_format: Optional[Dict[str, Any]] = None
-) -> str:
+    response_format: Optional[Dict[str, Any]] = None,
+    return_raw: bool = False
+):
     payload: Dict[str, Any] = {
         "model": MODEL_NAME,
         "messages": messages,
@@ -69,7 +70,10 @@ async def chat_completion(
             choices = data.get("choices", [])
             if not choices:
                 raise LlamaInferenceError("INFERENCE_ERROR", "No choices returned by inference engine.", 500)
-            return choices[0].get("message", {}).get("content", "")
+            content = choices[0].get("message", {}).get("content", "")
+            if return_raw:
+                return content, data
+            return content
     except httpx.ConnectError:
         raise LlamaInferenceError("MODEL_UNAVAILABLE", "llama.cpp inference service is unreachable.", 503)
     except httpx.TimeoutException:
@@ -129,8 +133,9 @@ async def vision_completion(
     mime_type: str,
     message: str,
     temperature: Optional[float] = None,
-    max_tokens: Optional[int] = None
-) -> str:
+    max_tokens: Optional[int] = None,
+    return_raw: bool = False
+):
     base64_str = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{base64_str}"
     messages = [
@@ -150,4 +155,4 @@ async def vision_completion(
             ]
         }
     ]
-    return await chat_completion(messages, temperature, max_tokens)
+    return await chat_completion(messages, temperature, max_tokens, return_raw=return_raw)

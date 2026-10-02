@@ -27,6 +27,7 @@ class KeyGenerateResponse(BaseModel):
 
 class ApiResponse(BaseModel):
     response: Any
+    raw_llama: Optional[Any] = None
 
 class ErrorDetail(BaseModel):
     code: str

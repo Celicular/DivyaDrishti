@@ -506,10 +506,12 @@ def reverse_geocode_endpoint(latitude: float, longitude: float):
         display_name=result.get("display_name")
     )
 
+@app.api_route("/ai", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"], tags=["AI"])
+@app.api_route("/api/ai", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"], tags=["AI"])
 @app.api_route("/ai/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"], tags=["AI"])
 @app.api_route("/api/ai/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"], tags=["AI"])
-async def proxy_gemma(path: str, request: Request):
-    target_url = f"{GEMMA_INTERNAL_URL}/{path}"
+async def proxy_gemma(request: Request, path: str = ""):
+    target_url = f"{GEMMA_INTERNAL_URL}/{path}".rstrip("/") if path else GEMMA_INTERNAL_URL
     headers = dict(request.headers)
     headers.pop("host", None)
     headers.pop("content-length", None)
