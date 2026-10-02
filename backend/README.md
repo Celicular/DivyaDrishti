@@ -57,9 +57,10 @@ docker compose up -d --build
 ```
 
 Interactive API documentation will be available at:
-- Backend Swagger UI: `http://localhost:8000/docs`
-- Backend ReDoc: `http://localhost:8000/redoc`
-- Gemma Inference API: `http://localhost:9000/docs` (see `gemma/README.md` for details)
+- Backend Swagger UI: `http://localhost:1379/docs`
+- Backend ReDoc: `http://localhost:1379/redoc`
+- Gemma Inference API: `http://localhost:13795/docs` (or via backend proxy `http://localhost:1379/ai/docs`)
+
 
 
 

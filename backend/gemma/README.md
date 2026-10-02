@@ -7,9 +7,10 @@ Standalone FastAPI gateway that wraps llama.cpp's OpenAI-compatible server for G
 ```text
 Client (Web / Mobile / Scripts)
   │
-  │ HTTP POST :9000 (Bearer / X-API-Key)
+  │ HTTP POST :13795 (Bearer / X-API-Key)
   ▼
-FastAPI Gateway (:9000)
+FastAPI Gateway (:13795)
+
   │
   │ Internal HTTP (:9100)
   ▼
@@ -59,7 +60,7 @@ python gemma/generate_key.py
 
 ### Generate Key via API
 ```bash
-curl -X POST http://localhost:9000/v1/auth/key \
+curl -X POST http://localhost:13795/v1/auth/key \
   -H "Content-Type: application/json" \
   -d '{"secret": "your_secret_key_here"}'
 ```
@@ -73,12 +74,12 @@ Clients can provide the key using either header:
 
 ### 1. Healthcheck
 ```bash
-curl http://localhost:9000/health
+curl http://localhost:13795/health
 ```
 
 ### 2. Text Chat (`POST /v1/chat`)
 ```bash
-curl -X POST http://localhost:9000/v1/chat \
+curl -X POST http://localhost:13795/v1/chat \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <API_KEY>" \
   -d '{
@@ -90,7 +91,7 @@ curl -X POST http://localhost:9000/v1/chat \
 
 ### 3. Streaming Chat (`POST /v1/chat/stream`)
 ```bash
-curl -N -X POST http://localhost:9000/v1/chat/stream \
+curl -N -X POST http://localhost:13795/v1/chat/stream \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <API_KEY>" \
   -d '{
@@ -100,7 +101,7 @@ curl -N -X POST http://localhost:9000/v1/chat/stream \
 
 ### 4. Multimodal Vision (`POST /v1/vision`)
 ```bash
-curl -X POST http://localhost:9000/v1/vision \
+curl -X POST http://localhost:13795/v1/vision \
   -H "Authorization: Bearer <API_KEY>" \
   -F "image=@photo.jpg" \
   -F "message=Describe what is happening in this image."
@@ -108,7 +109,7 @@ curl -X POST http://localhost:9000/v1/vision \
 
 ### 5. Structured JSON Output (`POST /v1/json`)
 ```bash
-curl -X POST http://localhost:9000/v1/json \
+curl -X POST http://localhost:13795/v1/json \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <API_KEY>" \
   -d '{

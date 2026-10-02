@@ -18,6 +18,8 @@ services:
       - DB_NAME=${DB_NAME:-ddrishti.db}
       - DB_DIR=${DB_DIR:-/app/data}
       - STORAGE_DIR=${STORAGE_DIR:-/app/storage}
+      - GEMMA_INTERNAL_URL=http://gemma-api:13795
+
     volumes:
       - backend_data:/app/data
       - backend_storage:/app/storage/buckets
@@ -66,7 +68,7 @@ services:
     container_name: ddrishti-gemma-api
     restart: unless-stopped
     ports:
-      - "${GEMMA_PORT:-9000}:9000"
+      - "13795:13795"
     env_file:
       - path: .env
         required: false
@@ -78,13 +80,14 @@ services:
       - TEMPERATURE=${GEMMA_TEMPERATURE:-0.7}
       - GEMMA_API_KEY_SECRET=${GEMMA_API_KEY_SECRET:-ddrishti_gemma_secret_hackathon_2026_cc6}
       - GEMMA_API_KEY=${GEMMA_API_KEY:-}
-      - PORT=9000
+      - PORT=13795
       - MAX_PARALLEL_INFERENCES=4
       - QUEUE_TIMEOUT=120
     depends_on:
       - llama
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:13795/health')"]
+
       interval: 20s
       timeout: 5s
       retries: 3
