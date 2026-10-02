@@ -1,2 +1,3 @@
 from .metadata_extractor import process_and_extract_metadata
 from .vision_indexer import VisionIndexer, extract_visual_evidence
+from .ai_indexing_worker import AIIndexingWorker, get_indexing_worker

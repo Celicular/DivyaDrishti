@@ -1,4 +1,5 @@
 import sqlite3
+import json
 from typing import Optional, List, Dict, Any
 
 try:
@@ -198,6 +199,21 @@ def _format_media_row(conn: sqlite3.Connection, asset_dict: Dict[str, Any]) -> D
         asset_dict["metadata"] = meta_dict
     else:
         asset_dict["metadata"] = None
+
+    cursor.execute("SELECT * FROM images_ai_inference WHERE image_id = ?", (asset_dict["id"],))
+    ai_row = cursor.fetchone()
+    if ai_row:
+        ai_dict = dict(ai_row)
+        for key in ("tag", "obj", "act", "evd", "cf"):
+            if isinstance(ai_dict.get(key), str):
+                try:
+                    ai_dict[key] = json.loads(ai_dict[key])
+                except Exception:
+                    ai_dict[key] = []
+        asset_dict["ai_inference"] = ai_dict
+    else:
+        asset_dict["ai_inference"] = None
+
     return asset_dict
 
 def create_media_asset(
@@ -361,3 +377,101 @@ def batch_delete_media_assets(image_ids: List[int], uid: int) -> List[Dict[str, 
     conn.commit()
     conn.close()
     return deleted_assets
+
+def save_image_ai_inference(project_id: int, image_id: int, ai_data: Dict[str, Any]) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    tag_str = json.dumps(ai_data.get("tag", []))
+    sdsc_str = str(ai_data.get("sdsc", "")).strip()
+    ddsc_str = str(ai_data.get("ddsc", "")).strip()
+    obj_str = json.dumps(ai_data.get("obj", []))
+    act_str = json.dumps(ai_data.get("act", []))
+    scn_str = str(ai_data.get("scn", "unknown")).strip()
+    tim_str = str(ai_data.get("tim", "unknown")).strip()
+    evd_str = json.dumps(ai_data.get("evd", []))
+    cf_str = json.dumps(ai_data.get("cf", []))
+
+    cursor.execute(
+        """
+        INSERT INTO images_ai_inference (
+            project_id, image_id, tag, sdsc, ddsc, obj, act, scn, tim, evd, cf
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(image_id) DO UPDATE SET
+            tag = excluded.tag,
+            sdsc = excluded.sdsc,
+            ddsc = excluded.ddsc,
+            obj = excluded.obj,
+            act = excluded.act,
+            scn = excluded.scn,
+            tim = excluded.tim,
+            evd = excluded.evd,
+            cf = excluded.cf,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (project_id, image_id, tag_str, sdsc_str, ddsc_str, obj_str, act_str, scn_str, tim_str, evd_str, cf_str)
+    )
+    cursor.execute("UPDATE media_assets SET is_ai_indexed = 1 WHERE id = ?", (image_id,))
+    conn.commit()
+    cursor.execute("SELECT * FROM images_ai_inference WHERE image_id = ?", (image_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        res = dict(row)
+        for key in ("tag", "obj", "act", "evd", "cf"):
+            if isinstance(res.get(key), str):
+                try:
+                    res[key] = json.loads(res[key])
+                except Exception:
+                    res[key] = []
+        return res
+    return ai_data
+
+def get_image_ai_inference(image_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM images_ai_inference WHERE image_id = ?", (image_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    res = dict(row)
+    for key in ("tag", "obj", "act", "evd", "cf"):
+        if isinstance(res.get(key), str):
+            try:
+                res[key] = json.loads(res[key])
+            except Exception:
+                res[key] = []
+    return res
+
+def get_unindexed_media_assets(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if project_id is not None:
+        cursor.execute(
+            "SELECT id, project_id, uid, file_name, original_file_name, display_name FROM media_assets WHERE is_ai_indexed = 0 AND project_id = ? ORDER BY id ASC",
+            (project_id,)
+        )
+    else:
+        cursor.execute(
+            "SELECT id, project_id, uid, file_name, original_file_name, display_name FROM media_assets WHERE is_ai_indexed = 0 ORDER BY id ASC"
+        )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_project_indexing_counts(project_id: int) -> Dict[str, int]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM media_assets WHERE project_id = ?", (project_id,))
+    total_row = cursor.fetchone()
+    total = total_row[0] if total_row else 0
+    cursor.execute("SELECT COUNT(*) FROM media_assets WHERE project_id = ? AND is_ai_indexed = 1", (project_id,))
+    indexed_row = cursor.fetchone()
+    indexed = indexed_row[0] if indexed_row else 0
+    conn.close()
+    return {
+        "total": total,
+        "indexed": indexed,
+        "pending": max(0, total - indexed)
+    }
+

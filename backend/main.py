@@ -1,3 +1,4 @@
+import json
 import secrets
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -27,7 +28,8 @@ try:
         update_media_asset,
         delete_media_asset,
         batch_update_media_assets,
-        batch_delete_media_assets
+        batch_delete_media_assets,
+        get_image_ai_inference
     )
     from backend.auth import verify_password, create_access_token, decode_access_token
     from backend.models import (
@@ -43,10 +45,12 @@ try:
         MediaUpdateRequest,
         MediaBatchUpdateRequest,
         MediaBatchDeleteRequest,
-        ReverseGeocodeResponse
+        ReverseGeocodeResponse,
+        IndexingStatusResponse
     )
     from backend.services.metadata_extractor import process_and_extract_metadata
     from backend.services.geocoder import reverse_geocode
+    from backend.services.ai_indexing_worker import get_indexing_worker
 except ImportError:
     from config import BUCKETS_DIR, GEMMA_INTERNAL_URL
     from database import (
@@ -66,7 +70,8 @@ except ImportError:
         update_media_asset,
         delete_media_asset,
         batch_update_media_assets,
-        batch_delete_media_assets
+        batch_delete_media_assets,
+        get_image_ai_inference
     )
     from auth import verify_password, create_access_token, decode_access_token
     from models import (
@@ -82,15 +87,21 @@ except ImportError:
         MediaUpdateRequest,
         MediaBatchUpdateRequest,
         MediaBatchDeleteRequest,
-        ReverseGeocodeResponse
+        ReverseGeocodeResponse,
+        IndexingStatusResponse
     )
     from services.metadata_extractor import process_and_extract_metadata
     from services.geocoder import reverse_geocode
+    from services.ai_indexing_worker import get_indexing_worker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    worker = get_indexing_worker()
+    worker.start()
+    await worker.hydrate_unindexed_from_db()
     yield
+    await worker.stop()
 
 app = FastAPI(
     title="DivyaDrishti Backend API",
@@ -372,9 +383,16 @@ async def upload_project_image(
         mime_type=mime_type,
         captured_at=meta.get("capture_datetime"),
         is_meta_indexed=meta.get("is_meta_indexed", False),
-        is_ai_indexed=meta.get("is_ai_indexed", True),
+        is_ai_indexed=False,
         is_ai_generated=meta.get("is_ai_generated", False),
         meta=meta
+    )
+
+    await get_indexing_worker().enqueue_image(
+        image_id=asset["id"],
+        project_id=project_id,
+        file_name=stored_filename,
+        is_priority=False
     )
 
     return MediaAssetResponse(**asset)
@@ -504,6 +522,92 @@ def reverse_geocode_endpoint(latitude: float, longitude: float):
         longitude=longitude,
         location_name=result.get("location_name"),
         display_name=result.get("display_name")
+    )
+
+@app.get("/api/projects/{project_id}/indexing/status", response_model=IndexingStatusResponse, tags=["AI"])
+def get_indexing_status(project_id: int, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    project = get_project_by_id(project_id)
+    if not project or project["uid"] != user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    status_data = get_indexing_worker().get_status(project_id)
+    return IndexingStatusResponse(**status_data)
+
+@app.post("/api/projects/{project_id}/images/{image_id}/force-index", tags=["AI"])
+async def force_index_image(project_id: int, image_id: int, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    project = get_project_by_id(project_id)
+    if not project or project["uid"] != user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    asset = get_media_asset_by_id(image_id)
+    if not asset or asset["project_id"] != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image not found"
+        )
+    ok = await get_indexing_worker().force_index_image(
+        image_id=image_id,
+        project_id=project_id,
+        file_name=asset["file_name"]
+    )
+    return {"success": ok, "image_id": image_id, "priority": True}
+
+@app.get("/api/projects/{project_id}/images/{image_id}/ai", tags=["AI"])
+def get_image_ai_data(project_id: int, image_id: int, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    project = get_project_by_id(project_id)
+    if not project or project["uid"] != user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    data = get_image_ai_inference(image_id)
+    if not data:
+        asset = get_media_asset_by_id(image_id)
+        if not asset or asset["project_id"] != project_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image not found"
+            )
+        return {"is_indexed": False, "status": "pending", "data": None}
+    return {"is_indexed": True, "status": "indexed", "data": data}
+
+@app.get("/api/projects/{project_id}/indexing/stream", tags=["AI"])
+async def stream_indexing_updates(project_id: int, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    project = get_project_by_id(project_id)
+    if not project or project["uid"] != user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    worker = get_indexing_worker()
+    queue = await worker.register_subscriber()
+
+    async def event_generator():
+        try:
+            initial_status = worker.get_status(project_id)
+            yield f"data: {json.dumps(initial_status)}\n\n"
+            while True:
+                event = await queue.get()
+                yield f"data: {json.dumps(event)}\n\n"
+        finally:
+            worker.remove_subscriber(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 @app.api_route("/ai", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"], tags=["AI"])

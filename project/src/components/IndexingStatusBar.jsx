@@ -1,16 +1,27 @@
 import React from 'react'
 import { Sparkles, CheckCircle2, Loader2 } from 'lucide-react'
 
+function formatEta(seconds) {
+  if (!seconds || seconds <= 0) return ''
+  if (seconds < 60) return `~${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const remSecs = seconds % 60
+  if (remSecs === 0) return `~${mins}m`
+  return `~${mins}m ${remSecs}s`
+}
+
 export default function IndexingStatusBar({
   totalImages = 0,
   indexedCount = 0,
   isIndexing = false,
   isCollapsed = false,
+  estimatedSeconds = 0,
   onSimulateToggle
 }) {
   if (totalImages === 0) return null
 
   const isAllIndexed = !isIndexing && indexedCount >= totalImages
+  const etaText = formatEta(estimatedSeconds)
 
   return (
     <div
@@ -29,7 +40,7 @@ export default function IndexingStatusBar({
         )}
         <span className="font-medium text-[#f0f4f1]">
           {isIndexing || !isAllIndexed
-            ? `Indexing ${indexedCount} out of ${totalImages} images`
+            ? `Indexing ${indexedCount} out of ${totalImages} images${isIndexing && etaText ? ` • ${etaText} remaining` : ''}`
             : 'All images indexed'}
         </span>
       </div>

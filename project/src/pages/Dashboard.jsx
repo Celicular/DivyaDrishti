@@ -43,7 +43,8 @@ import {
   batchUpdateImages,
   batchDeleteImages,
   getMediaUrl,
-  reverseGeocode
+  reverseGeocode,
+  getIndexingStatus
 } from '../api/media'
 import Lightbox from '../components/Lightbox'
 import IndexingStatusBar from '../components/IndexingStatusBar'
@@ -171,57 +172,39 @@ export default function Dashboard() {
     setSelectedImageIds([])
   }, [openFolderId, activeScreen])
 
-  const [mockIndexedCount, setMockIndexedCount] = useState(0)
-  const [isSimulatingIndexing, setIsSimulatingIndexing] = useState(false)
+  const [indexingStatus, setIndexingStatus] = useState({
+    is_indexing: false,
+    total_images: 0,
+    indexed_count: 0,
+    pending_count: 0,
+    currently_indexing: [],
+    estimated_remaining_seconds: 0
+  })
 
   useEffect(() => {
-    if (projectMedia.length > 0) {
-      setMockIndexedCount((prev) => {
-        if (prev === 0) {
-          return Math.max(1, Math.min(projectMedia.length - 1, 2))
-        }
-        return Math.min(prev, projectMedia.length)
-      })
-    } else {
-      setMockIndexedCount(0)
-      setIsSimulatingIndexing(false)
-    }
-  }, [projectMedia])
+    if (!openFolderId || activeScreen !== 'add-files') return
+    let isMounted = true
 
-  useEffect(() => {
-    let timer
-    if (isSimulatingIndexing && projectMedia.length > 0) {
-      timer = setInterval(() => {
-        setMockIndexedCount((prev) => {
-          if (prev >= projectMedia.length) {
-            setIsSimulatingIndexing(false)
-            return projectMedia.length
+    const runCheck = async () => {
+      const res = await getIndexingStatus(openFolderId)
+      if (res.success && res.data && isMounted) {
+        setIndexingStatus((prev) => {
+          if (res.data.indexed_count !== prev.indexed_count && openFolderId) {
+            loadMediaForFolder(openFolderId)
           }
-          const next = prev + 1
-          if (next >= projectMedia.length) {
-            setIsSimulatingIndexing(false)
-          }
-          return next
+          return res.data
         })
-      }, 900)
+      }
     }
-    return () => clearInterval(timer)
-  }, [isSimulatingIndexing, projectMedia.length])
 
-  const handleSimulateToggle = () => {
-    if (mockIndexedCount >= projectMedia.length) {
-      setMockIndexedCount(0)
-      setIsSimulatingIndexing(true)
-    } else {
-      setMockIndexedCount(projectMedia.length)
-      setIsSimulatingIndexing(false)
+    runCheck()
+    const pollInterval = indexingStatus.is_indexing ? 2500 : 8000
+    const timer = setInterval(runCheck, pollInterval)
+    return () => {
+      isMounted = false
+      clearInterval(timer)
     }
-  }
-
-  const handleReindex = () => {
-    setMockIndexedCount(0)
-    setIsSimulatingIndexing(true)
-  }
+  }, [openFolderId, activeScreen, indexingStatus.is_indexing])
 
   useEffect(() => {
     const token = getAuthToken()
@@ -1204,6 +1187,15 @@ export default function Dashboard() {
                                       loading="lazy"
                                     />
 
+                                    {!isItemIndexed && (
+                                      <span
+                                        className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#161c17]/85 text-amber-300 border border-amber-500/30 shadow-xs pointer-events-none z-10"
+                                        title="Queued for visual evidence indexing"
+                                      >
+                                        Pending AI
+                                      </span>
+                                    )}
+
                                     <button
                                       type="button"
                                       className={`card-select-checkbox ${isSelected ? 'is-checked' : ''}`}
@@ -1285,11 +1277,11 @@ export default function Dashboard() {
                   )}
 
                   <IndexingStatusBar
-                    totalImages={projectMedia.length}
-                    indexedCount={mockIndexedCount}
-                    isIndexing={isSimulatingIndexing}
+                    totalImages={indexingStatus.total_images || projectMedia.length}
+                    indexedCount={indexingStatus.indexed_count}
+                    isIndexing={indexingStatus.is_indexing}
+                    estimatedSeconds={indexingStatus.estimated_remaining_seconds}
                     isCollapsed={isCollapsed}
-                    onSimulateToggle={handleSimulateToggle}
                   />
                 </div>
               )}
@@ -1458,16 +1450,21 @@ export default function Dashboard() {
 
       {lightboxIndex !== null && (
         <Lightbox
-          images={sortedMedia.map((m, idx) => ({
-            ...m,
-            is_ai_indexed: m.is_ai_indexed || (idx < mockIndexedCount)
-          }))}
+          images={sortedMedia}
           currentIndex={lightboxIndex}
           resolvedLocations={resolvedLocations}
           onClose={() => setLightboxIndex(null)}
           onNavigate={(newIdx) => setLightboxIndex(newIdx)}
           onUpdateDisplayName={handleUpdateImageName}
           onDeleteImage={handleDeleteImage}
+          onForceIndex={async () => {
+            if (openFolderId) {
+              const res = await getIndexingStatus(openFolderId)
+              if (res.success && res.data) {
+                setIndexingStatus(res.data)
+              }
+            }
+          }}
         />
       )}
 

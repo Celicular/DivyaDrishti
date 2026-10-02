@@ -17,9 +17,13 @@ import {
   FileBadge,
   Calendar,
   Camera,
-  Sparkles
+  Sparkles,
+  Clock,
+  Zap,
+  Check,
+  Loader2
 } from 'lucide-react'
-import { getMediaUrl, reverseGeocode } from '../api/media'
+import { getMediaUrl, reverseGeocode, forceIndexImage, getImageAiData } from '../api/media'
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return ''
@@ -62,7 +66,8 @@ export default function Lightbox({
   onClose,
   onNavigate,
   onUpdateDisplayName,
-  onDeleteImage
+  onDeleteImage,
+  onForceIndex
 }) {
   const [zoom, setZoom] = useState(1)
   const [showDrawer, setShowDrawer] = useState(true)
@@ -70,6 +75,11 @@ export default function Lightbox({
   const [nameDraft, setNameDraft] = useState('')
   const [isSubmittingName, setIsSubmittingName] = useState(false)
   const [activeLocation, setActiveLocation] = useState(null)
+  const [activeTab, setActiveTab] = useState('specs')
+  const [aiData, setAiData] = useState(null)
+  const [loadingAi, setLoadingAi] = useState(false)
+  const [isForceIndexing, setIsForceIndexing] = useState(false)
+  const [isForceQueued, setIsForceQueued] = useState(false)
 
   const currentImage = images[currentIndex] || null
 
@@ -78,6 +88,22 @@ export default function Lightbox({
       setNameDraft(currentImage.display_name || '')
       setIsEditingName(false)
       setZoom(1)
+      setIsForceQueued(false)
+
+      if (currentImage.ai_inference) {
+        setAiData(currentImage.ai_inference)
+      } else if (currentImage.is_ai_indexed) {
+        setLoadingAi(true)
+        getImageAiData(currentImage.project_id, currentImage.id)
+          .then((res) => {
+            if (res.success && res.data?.data) {
+              setAiData(res.data.data)
+            }
+          })
+          .finally(() => setLoadingAi(false))
+      } else {
+        setAiData(null)
+      }
 
       const meta = currentImage.metadata || {}
       const hasGps =
@@ -105,6 +131,17 @@ export default function Lightbox({
       }
     }
   }, [currentIndex, currentImage, resolvedLocations])
+
+  const handleForceIndex = async () => {
+    if (!currentImage || isForceIndexing) return
+    setIsForceIndexing(true)
+    const res = await forceIndexImage(currentImage.project_id, currentImage.id)
+    setIsForceIndexing(false)
+    if (res.success) {
+      setIsForceQueued(true)
+      if (onForceIndex) onForceIndex(currentImage.id)
+    }
+  }
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -340,194 +377,367 @@ export default function Lightbox({
         {showDrawer && (
           <aside className="w-88 md:w-96 bg-white border-l border-[#e7e3da] flex flex-col h-full overflow-y-auto p-6 z-20 flex-shrink-0">
             <div className="flex items-center justify-between pb-3 border-b border-[#eeebe3]">
-              <span className="text-xs uppercase tracking-wider font-semibold text-[#5b655c]">
-                Evidence & Provenance
-              </span>
+              <div className="flex items-center gap-1 bg-[#f4f2eb] p-0.5 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('specs')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                    activeTab === 'specs'
+                      ? 'bg-white text-[#252824] shadow-xs'
+                      : 'text-[#6d776e] hover:text-[#252824]'
+                  }`}
+                >
+                  EXIF & Specs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('ai')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1 transition-all cursor-pointer ${
+                    activeTab === 'ai'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-[#6d776e] hover:text-emerald-700'
+                  }`}
+                >
+                  <Sparkles size={12} className={currentImage?.is_ai_indexed ? 'text-emerald-600' : 'text-amber-500'} />
+                  <span>AI Evidence</span>
+                </button>
+              </div>
               <span className="text-xs font-mono font-medium text-[#7c877d]">ID #{currentImage.id}</span>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3">
-              {currentImage.is_ai_generated ? (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900">
-                  <div className="flex items-center gap-2 font-semibold text-xs text-rose-700">
-                    <AlertTriangle size={15} />
-                    AI Generation Flagged
-                  </div>
-                  <p className="mt-1 text-xs text-rose-800/80 leading-relaxed">
-                    Synthetic generator markers or C2PA generative signatures were detected in this media file.
-                  </p>
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
-                  <div className="flex items-center gap-2 font-semibold text-xs text-emerald-700">
-                    <ShieldCheck size={16} />
-                    Camera Provenance Verified
-                  </div>
-                  <p className="mt-1 text-xs text-emerald-800/80 leading-relaxed">
-                    Standard optical sensor capture attributes matched without AI synthetic signatures.
-                  </p>
-                </div>
-              )}
-
-              {meta.c2pa_manifest_detected && (
-                <div className="p-3 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-xs">
-                  <div className="font-semibold text-sky-700 flex items-center gap-1.5">
-                    <FileBadge size={15} />
-                    C2PA Manifest Detected
-                  </div>
-                  <div className="text-[11.5px] text-sky-800/80 mt-0.5">
-                    JUMBF content credentials structure located inside file binary.
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {hasGps ? (
-              <div className="mt-6">
-                <span className="text-xs uppercase tracking-wider font-semibold text-[#5b655c] block pb-2 border-b border-[#eeebe3]">
-                  Location & Timestamp
-                </span>
-                <dl className="mt-3 flex flex-col gap-3 text-xs">
-                  <div>
-                    <dt className="text-[#6d776e] flex items-center gap-1.5">
-                      <Calendar size={13} /> Capture Date / Time
-                    </dt>
-                    <dd className="font-medium text-[#252824] mt-1 pl-4">
-                      {formatDisplayDate(meta.capture_datetime || currentImage.captured_at) ||
-                       formatDisplayDate(currentImage.upload_time) ||
-                       'Not recorded in EXIF'}
-                    </dd>
-                  </div>
-
-                  <div>
-                    <dt className="text-[#6d776e] flex items-center gap-1.5">
-                      <MapPin size={13} /> Location
-                    </dt>
-                    <dd className={`font-semibold mt-1 pl-4 ${activeLocation === 'Location unavailable' ? 'text-[#7c877d]' : 'text-[#188f70]'}`}>
-                      {activeLocation || 'Location unavailable'}
-                    </dd>
-                  </div>
-
-                  {!(meta.latitude === 0 && meta.longitude === 0) && (
-                    <div>
-                      <dt className="text-[#6d776e]">Coordinates</dt>
-                      <dd className="mt-1 pl-4 flex flex-col gap-1">
-                        <span className="font-mono text-[#252824]">
-                          {meta.latitude.toFixed(6)}, {meta.longitude.toFixed(6)}
-                          {meta.altitude ? ` (${meta.altitude}m)` : ''}
-                        </span>
-                        <a
-                          href={gpsUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[#188f70] hover:text-[#006b49] font-medium underline"
-                        >
-                          <span>Open in Google Maps</span>
-                          <ExternalLink size={12} />
-                        </a>
-                      </dd>
+            {activeTab === 'specs' ? (
+              <>
+                <div className="mt-4 flex flex-col gap-3">
+                  {currentImage.is_ai_generated ? (
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900">
+                      <div className="flex items-center gap-2 font-semibold text-xs text-rose-700">
+                        <AlertTriangle size={15} />
+                        AI Generation Flagged
+                      </div>
+                      <p className="mt-1 text-xs text-rose-800/80 leading-relaxed">
+                        Synthetic generator markers or C2PA generative signatures were detected in this media file.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+                      <div className="flex items-center gap-2 font-semibold text-xs text-emerald-700">
+                        <ShieldCheck size={16} />
+                        Camera Provenance Verified
+                      </div>
+                      <p className="mt-1 text-xs text-emerald-800/80 leading-relaxed">
+                        Standard optical sensor capture attributes matched without AI synthetic signatures.
+                      </p>
                     </div>
                   )}
-                </dl>
-              </div>
-            ) : (meta.capture_datetime || currentImage.captured_at || currentImage.upload_time) ? (
-              <div className="mt-6">
-                <span className="text-xs uppercase tracking-wider font-semibold text-[#5b655c] block pb-2 border-b border-[#eeebe3]">
-                  Timestamp
-                </span>
-                <dl className="mt-3 flex flex-col gap-3 text-xs">
-                  <div>
-                    <dt className="text-[#6d776e] flex items-center gap-1.5">
-                      <Calendar size={13} /> Capture Date / Time
-                    </dt>
-                    <dd className="font-medium text-[#252824] mt-1 pl-4">
-                      {formatDisplayDate(meta.capture_datetime || currentImage.captured_at) ||
-                       formatDisplayDate(currentImage.upload_time) ||
-                       'Not recorded in EXIF'}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            ) : null}
 
-            <div className="mt-6">
-              <span className="text-xs uppercase tracking-wider font-semibold text-[#5b655c] block pb-2 border-b border-[#eeebe3]">
-                Device & Technical Specs
-              </span>
-              <dl className="mt-3 flex flex-col gap-2.5 text-xs">
-                <div>
-                  <dt className="text-[#6d776e] flex items-center gap-1.5">
-                    <Camera size={13} /> Camera Device
-                  </dt>
-                  <dd className="font-medium text-[#252824] mt-0.5 pl-4">
-                    {meta.camera_make || meta.camera_model
-                      ? `${meta.camera_make || ''} ${meta.camera_model || ''}`.trim()
-                      : 'Unknown / Not recorded'}
-                  </dd>
+                  {meta.c2pa_manifest_detected && (
+                    <div className="p-3 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-xs">
+                      <div className="font-semibold text-sky-700 flex items-center gap-1.5">
+                        <FileBadge size={15} />
+                        C2PA Manifest Detected
+                      </div>
+                      <div className="text-[11.5px] text-sky-800/80 mt-0.5">
+                        JUMBF content credentials structure located inside file binary.
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {meta.lens_model && (
-                  <div>
-                    <dt className="text-[#6d776e]">Lens Model</dt>
-                    <dd className="font-medium text-[#252824] mt-0.5">{meta.lens_model}</dd>
-                  </div>
-                )}
+                {hasGps ? (
+                  <div className="mt-6">
+                    <span className="text-xs uppercase tracking-wider font-semibold text-[#5b655c] block pb-2 border-b border-[#eeebe3]">
+                      Location & Timestamp
+                    </span>
+                    <dl className="mt-3 flex flex-col gap-3 text-xs">
+                      <div>
+                        <dt className="text-[#6d776e] flex items-center gap-1.5">
+                          <Calendar size={13} /> Capture Date / Time
+                        </dt>
+                        <dd className="font-medium text-[#252824] mt-1 pl-4">
+                          {formatDisplayDate(meta.capture_datetime || currentImage.captured_at) ||
+                           formatDisplayDate(currentImage.upload_time) ||
+                           'Not recorded in EXIF'}
+                        </dd>
+                      </div>
 
-                <div>
-                  <dt className="text-[#6d776e]">Dimensions</dt>
-                  <dd className="font-medium text-[#252824] mt-0.5">
-                    {meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Unknown'}
-                  </dd>
-                </div>
+                      <div>
+                        <dt className="text-[#6d776e] flex items-center gap-1.5">
+                          <MapPin size={13} /> Location
+                        </dt>
+                        <dd className={`font-semibold mt-1 pl-4 ${activeLocation === 'Location unavailable' ? 'text-[#7c877d]' : 'text-[#188f70]'}`}>
+                          {activeLocation || 'Location unavailable'}
+                        </dd>
+                      </div>
 
-                <div>
-                  <dt className="text-[#6d776e]">File Size & Format</dt>
-                  <dd className="font-medium text-[#252824] mt-0.5">
-                    {formatFileSize(currentImage.file_size)} • {currentImage.mime_type}
-                  </dd>
-                </div>
-
-                {meta.software && (
-                  <div>
-                    <dt className="text-[#6d776e]">Software / Processing</dt>
-                    <dd className="font-medium text-[#252824] mt-0.5 break-words">{meta.software}</dd>
-                  </div>
-                )}
-
-                {meta.creator && (
-                  <div>
-                    <dt className="text-[#6d776e]">Photographer / Creator</dt>
-                    <dd className="font-medium text-[#252824] mt-0.5">{meta.creator}</dd>
-                  </div>
-                )}
-
-                {meta.description && (
-                  <div>
-                    <dt className="text-[#6d776e] flex items-center gap-1.5">
-                      {currentImage.is_ai_indexed && (
-                        <Sparkles size={12} className="text-emerald-600 shrink-0" />
+                      {!(meta.latitude === 0 && meta.longitude === 0) && (
+                        <div>
+                          <dt className="text-[#6d776e]">Coordinates</dt>
+                          <dd className="mt-1 pl-4 flex flex-col gap-1">
+                            <span className="font-mono text-[#252824]">
+                              {meta.latitude.toFixed(6)}, {meta.longitude.toFixed(6)}
+                              {meta.altitude ? ` (${meta.altitude}m)` : ''}
+                            </span>
+                            <a
+                              href={gpsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[#188f70] hover:text-[#006b49] font-medium underline"
+                            >
+                              <span>Open in Google Maps</span>
+                              <ExternalLink size={12} />
+                            </a>
+                          </dd>
+                        </div>
                       )}
-                      <span>Embedded Description</span>
-                    </dt>
-                    <dd className="font-medium text-[#252824] mt-0.5 italic">{meta.description}</dd>
+                    </dl>
                   </div>
-                )}
-
-                {meta.copyright && (
-                  <div>
-                    <dt className="text-[#6d776e]">Copyright / License</dt>
-                    <dd className="font-medium text-[#252824] mt-0.5">{meta.copyright}</dd>
+                ) : (meta.capture_datetime || currentImage.captured_at || currentImage.upload_time) ? (
+                  <div className="mt-6">
+                    <span className="text-xs uppercase tracking-wider font-semibold text-[#5b655c] block pb-2 border-b border-[#eeebe3]">
+                      Timestamp
+                    </span>
+                    <dl className="mt-3 flex flex-col gap-3 text-xs">
+                      <div>
+                        <dt className="text-[#6d776e] flex items-center gap-1.5">
+                          <Calendar size={13} /> Capture Date / Time
+                        </dt>
+                        <dd className="font-medium text-[#252824] mt-1 pl-4">
+                          {formatDisplayDate(meta.capture_datetime || currentImage.captured_at) ||
+                           formatDisplayDate(currentImage.upload_time) ||
+                           'Not recorded in EXIF'}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
-                )}
+                ) : null}
 
-                <div>
-                  <dt className="text-[#6d776e]">Storage Filename</dt>
-                  <dd className="font-mono text-[11px] text-[#7c877d] mt-0.5 break-all">
-                    {currentImage.file_name}
-                  </dd>
+                <div className="mt-6">
+                  <span className="text-xs uppercase tracking-wider font-semibold text-[#5b655c] block pb-2 border-b border-[#eeebe3]">
+                    Device & Technical Specs
+                  </span>
+                  <dl className="mt-3 flex flex-col gap-2.5 text-xs">
+                    <div>
+                      <dt className="text-[#6d776e] flex items-center gap-1.5">
+                        <Camera size={13} /> Camera Device
+                      </dt>
+                      <dd className="font-medium text-[#252824] mt-0.5 pl-4">
+                        {meta.camera_make || meta.camera_model
+                          ? `${meta.camera_make || ''} ${meta.camera_model || ''}`.trim()
+                          : 'Unknown / Not recorded'}
+                      </dd>
+                    </div>
+
+                    {meta.lens_model && (
+                      <div>
+                        <dt className="text-[#6d776e]">Lens Model</dt>
+                        <dd className="font-medium text-[#252824] mt-0.5">{meta.lens_model}</dd>
+                      </div>
+                    )}
+
+                    <div>
+                      <dt className="text-[#6d776e]">Dimensions</dt>
+                      <dd className="font-medium text-[#252824] mt-0.5">
+                        {meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Unknown'}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt className="text-[#6d776e]">File Size & Format</dt>
+                      <dd className="font-medium text-[#252824] mt-0.5">
+                        {formatFileSize(currentImage.file_size)} • {currentImage.mime_type}
+                      </dd>
+                    </div>
+
+                    {meta.software && (
+                      <div>
+                        <dt className="text-[#6d776e]">Software / Processing</dt>
+                        <dd className="font-medium text-[#252824] mt-0.5 break-words">{meta.software}</dd>
+                      </div>
+                    )}
+
+                    {meta.creator && (
+                      <div>
+                        <dt className="text-[#6d776e]">Photographer / Creator</dt>
+                        <dd className="font-medium text-[#252824] mt-0.5">{meta.creator}</dd>
+                      </div>
+                    )}
+
+                    {meta.description && (
+                      <div>
+                        <dt className="text-[#6d776e] flex items-center gap-1.5">
+                          {currentImage.is_ai_indexed && (
+                            <Sparkles size={12} className="text-emerald-600 shrink-0" />
+                          )}
+                          <span>Embedded Description</span>
+                        </dt>
+                        <dd className="font-medium text-[#252824] mt-0.5 italic">{meta.description}</dd>
+                      </div>
+                    )}
+
+                    {meta.copyright && (
+                      <div>
+                        <dt className="text-[#6d776e]">Copyright / License</dt>
+                        <dd className="font-medium text-[#252824] mt-0.5">{meta.copyright}</dd>
+                      </div>
+                    )}
+
+                    <div>
+                      <dt className="text-[#6d776e]">Storage Filename</dt>
+                      <dd className="font-mono text-[11px] text-[#7c877d] mt-0.5 break-all">
+                        {currentImage.file_name}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
-              </dl>
-            </div>
+              </>
+            ) : (
+              <div className="mt-4 flex flex-col gap-4 text-xs">
+                {!currentImage.is_ai_indexed ? (
+                  <div className="flex flex-col gap-4">
+                    <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 text-[#252824]">
+                      <div className="flex items-center gap-2 font-semibold text-xs text-amber-800">
+                        <Clock size={15} className="text-amber-600" />
+                        <span>Pending AI Indexing</span>
+                      </div>
+                      <p className="mt-1 text-xs text-amber-900/80 leading-relaxed">
+                        Visual evidence and semantic tags have not been generated for this image yet. It is currently in the background queue.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isForceIndexing || isForceQueued}
+                      onClick={handleForceIndex}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                    >
+                      {isForceIndexing ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Submitting to Priority Queue...</span>
+                        </>
+                      ) : isForceQueued ? (
+                        <>
+                          <Check size={14} />
+                          <span>Prioritized for Next Batch</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap size={14} />
+                          <span>Force Index Now</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : loadingAi ? (
+                  <div className="flex items-center justify-center py-12 text-[#6d776e] gap-2">
+                    <Loader2 size={16} className="animate-spin text-emerald-600" />
+                    <span>Loading visual evidence...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {aiData?.tag?.length > 0 && (
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c] block pb-1.5 border-b border-[#eeebe3]">
+                          Search Tags
+                        </span>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {aiData.tag.map((t, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/60 text-xs font-medium"
+                            >
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {aiData?.sdsc && (
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c] block pb-1.5 border-b border-[#eeebe3]">
+                          Semantic Summary
+                        </span>
+                        <p className="mt-2 text-xs text-[#252824] font-medium leading-relaxed p-2.5 rounded-lg bg-[#faf9f6] border border-[#e7e3da]">
+                          "{aiData.sdsc}"
+                        </p>
+                      </div>
+                    )}
+
+                    {aiData?.ddsc && (
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c] block pb-1.5 border-b border-[#eeebe3]">
+                          Visual Details
+                        </span>
+                        <p className="mt-2 text-xs text-[#4b554d] leading-relaxed">
+                          {aiData.ddsc}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#eeebe3]">
+                      <div className="p-2.5 rounded-lg bg-[#faf9f6] border border-[#e7e3da]">
+                        <span className="text-[10.5px] uppercase tracking-wider font-semibold text-[#6d776e] block">Scene</span>
+                        <span className="text-xs font-medium text-[#252824] capitalize mt-0.5 block truncate">
+                          {aiData?.scn || 'Unknown'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-[#faf9f6] border border-[#e7e3da]">
+                        <span className="text-[10.5px] uppercase tracking-wider font-semibold text-[#6d776e] block">Lighting</span>
+                        <span className="text-xs font-medium text-[#252824] capitalize mt-0.5 block truncate">
+                          {aiData?.tim || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {aiData?.obj?.length > 0 && (
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c] block pb-1.5 border-b border-[#eeebe3]">
+                          Identified Objects ({aiData.obj.length})
+                        </span>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {aiData.obj.map((o, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded bg-[#f0eee6] text-[#3e473f] text-[11.5px]">
+                              {o}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {aiData?.act?.length > 0 && (
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c] block pb-1.5 border-b border-[#eeebe3]">
+                          Active Actions ({aiData.act.length})
+                        </span>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {aiData.act.map((a, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200/50 text-[11.5px]">
+                              {a}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {aiData?.evd?.length > 0 && (
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c] block pb-1.5 border-b border-[#eeebe3]">
+                          Visual Evidence Points
+                        </span>
+                        <ul className="mt-2 flex flex-col gap-1.5 pl-3">
+                          {aiData.evd.map((pt, idx) => (
+                            <li key={idx} className="text-xs text-[#353c36] list-disc leading-snug">
+                              {pt}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-auto pt-6 border-t border-[#eeebe3]">
               <button
@@ -552,7 +762,7 @@ export default function Lightbox({
             key={img.id}
             type="button"
             onClick={() => onNavigate(idx)}
-            className={`h-14 w-14 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+            className={`h-14 w-14 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all relative ${
               idx === currentIndex
                 ? 'border-[#188f70] scale-105 shadow-sm'
                 : 'border-transparent opacity-60 hover:opacity-100 hover:border-[#dcd7cc]'
@@ -564,6 +774,9 @@ export default function Lightbox({
               alt={img.display_name}
               className="w-full h-full object-cover"
             />
+            {!img.is_ai_indexed && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 border border-black/40" title="Pending AI indexing" />
+            )}
           </button>
         ))}
       </footer>

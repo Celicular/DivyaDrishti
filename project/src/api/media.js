@@ -139,3 +139,32 @@ export async function reverseGeocode(latitude, longitude) {
   }
 }
 
+export async function getIndexingStatus(projectId) {
+  try {
+    const response = await apiClient.get(`/projects/${projectId}/indexing/status`)
+    return { success: true, data: response.data }
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || 'Failed to fetch indexing status'
+    return { success: false, error: message }
+  }
+}
+
+export async function forceIndexImage(projectId, imageId) {
+  try {
+    const response = await apiClient.post(`/projects/${projectId}/images/${imageId}/force-index`)
+    return { success: true, data: response.data }
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || 'Failed to force index image'
+    return { success: false, error: message }
+  }
+}
+
+export async function getImageAiData(projectId, imageId) {
+  try {
+    const response = await apiClient.get(`/projects/${projectId}/images/${imageId}/ai`)
+    return { success: true, data: response.data }
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || 'Failed to fetch AI data'
+    return { success: false, error: message }
+  }
+}

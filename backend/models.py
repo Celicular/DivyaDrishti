@@ -91,6 +91,7 @@ class MediaAssetResponse(BaseModel):
     is_ai_indexed: bool
     is_ai_generated: bool
     metadata: Optional[MediaMetadataResponse] = None
+    ai_inference: Optional[dict] = None
 
 class MediaUpdateRequest(BaseModel):
     display_name: Optional[str] = Field(None, min_length=1, max_length=200)
@@ -101,3 +102,11 @@ class MediaBatchUpdateRequest(BaseModel):
 
 class MediaBatchDeleteRequest(BaseModel):
     image_ids: List[int] = Field(..., min_length=1)
+
+class IndexingStatusResponse(BaseModel):
+    is_indexing: bool
+    total_images: int
+    indexed_count: int
+    pending_count: int
+    currently_indexing: List[int]
+    estimated_remaining_seconds: int
