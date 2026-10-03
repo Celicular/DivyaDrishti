@@ -35,7 +35,8 @@ import {
   Compass,
   Search,
   RotateCcw,
-  FileText
+  FileText,
+  BarChart3
 } from 'lucide-react'
 import { getCurrentUser, getAuthToken, logout } from '../api/auth'
 import { getProjects, createProject, updateProject, deleteProject } from '../api/projects'
@@ -55,6 +56,7 @@ import Lightbox from '../components/Lightbox'
 import IndexingStatusBar from '../components/IndexingStatusBar'
 import ExploreView from '../components/ExploreView'
 import ExportReportView from '../components/ExportReportView'
+import ImpactInsightsView from '../components/ImpactInsightsView'
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return ''
@@ -263,7 +265,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeScreen === 'add-files' && openFolderId) {
       loadMediaForFolder(openFolderId)
-    } else if (activeScreen === 'export') {
+    } else if (activeScreen === 'export' || activeScreen === 'insights') {
       const targetFolder = openFolderId || selectedProjectId || (projects[0]?.id ?? null)
       if (targetFolder && projectMedia.length === 0) {
         loadMediaForFolder(targetFolder)
@@ -740,6 +742,16 @@ export default function Dashboard() {
 
           <button
             type="button"
+            onClick={() => setActiveScreen('insights')}
+            className={`nav-item ${activeScreen === 'insights' ? 'is-active' : ''}`}
+            title="Impact Insights"
+          >
+            <BarChart3 size={20} className="nav-icon" />
+            {!isCollapsed && <span className="nav-label">Insights</span>}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveScreen('add-files')}
             className={`nav-item ${activeScreen === 'add-files' ? 'is-active' : ''}`}
             title="Add files"
@@ -788,10 +800,10 @@ export default function Dashboard() {
         <header className="content-topbar">
           <div className="topbar-left">
             <span className="breadcrumb-path">
-              Workspace / {activeScreen === 'dashboard' ? 'Projects & Overview' : activeScreen === 'explore' ? 'Visual Evidence & Search' : activeScreen === 'export' ? 'Report Generation' : 'Drive Storage'}
+              Workspace / {activeScreen === 'dashboard' ? 'Projects & Overview' : activeScreen === 'explore' ? 'Visual Evidence & Search' : activeScreen === 'insights' ? 'Impact & Intelligence Insights' : activeScreen === 'export' ? 'Report Generation' : 'Drive Storage'}
             </span>
             <h1 className="screen-heading">
-              {activeScreen === 'dashboard' ? 'Dashboard' : activeScreen === 'explore' ? 'Explore' : activeScreen === 'export' ? 'Export Report' : 'Add files'}
+              {activeScreen === 'dashboard' ? 'Dashboard' : activeScreen === 'explore' ? 'Explore' : activeScreen === 'insights' ? 'Impact Insights' : activeScreen === 'export' ? 'Export Report' : 'Add files'}
             </h1>
           </div>
 
@@ -1387,6 +1399,16 @@ export default function Dashboard() {
               projects={projects}
               user={user}
               onOpenLightbox={(imgs, idx) => setExploreLightbox({ isOpen: true, images: imgs, index: idx })}
+            />
+          )}
+
+          {activeScreen === 'insights' && (
+            <ImpactInsightsView
+              projects={projects}
+              currentProjectId={openFolderId || selectedProjectId}
+              projectMedia={projectMedia}
+              onNavigateToExport={() => setActiveScreen('export')}
+              onNavigateToExplore={() => setActiveScreen('explore')}
             />
           )}
 
