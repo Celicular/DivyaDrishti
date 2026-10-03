@@ -6,7 +6,7 @@ services:
     container_name: ddrishti-backend
     restart: unless-stopped
     ports:
-      - "${PORT:-1379}:1379"
+      - "${PORT:-1379}:${PORT:-1379}"
     env_file:
       - path: .env
         required: false
@@ -22,10 +22,12 @@ services:
       - USE_EXTERNAL_AI_API=${USE_EXTERNAL_AI_API:-false}
       - EXTERNAL_AI_URL=${EXTERNAL_AI_URL:-https://ddapi.celi.me/ai}
       - INTERNAL_AI_URL=${INTERNAL_AI_URL:-http://gemma-api:13795}
+      - MODELS_DIR=${MODELS_DIR:-/models}
 
     volumes:
       - backend_data:/app/data
       - backend_storage:/app/storage/buckets
+      - gemma_models:/models
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request, os; urllib.request.urlopen('http://localhost:' + os.getenv('PORT', '1379') + '/health')"]
 

@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 class LoginRequest(BaseModel):
@@ -103,6 +103,9 @@ class MediaBatchUpdateRequest(BaseModel):
 class MediaBatchDeleteRequest(BaseModel):
     image_ids: List[int] = Field(..., min_length=1)
 
+class MediaBatchReindexRequest(BaseModel):
+    image_ids: List[int] = Field(..., min_length=1)
+
 class IndexingStatusResponse(BaseModel):
     is_indexing: bool
     total_images: int
@@ -110,3 +113,20 @@ class IndexingStatusResponse(BaseModel):
     pending_count: int
     currently_indexing: List[int]
     estimated_remaining_seconds: int
+
+class ExploreSearchRequest(BaseModel):
+    query: Optional[str] = ""
+    similar_to_image_id: Optional[int] = None
+    project_ids: Optional[List[int]] = None
+    tim: Optional[str] = None
+    iq_label: Optional[str] = None
+    min_iq_score: Optional[float] = None
+    scn: Optional[str] = None
+    sort_by: Optional[str] = "relevance"
+    limit: int = Field(default=100, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+
+class ExploreSearchResponse(BaseModel):
+    total_matches: int
+    results: List[Dict[str, Any]]
+    facets: Dict[str, Any]

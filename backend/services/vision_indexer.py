@@ -7,6 +7,15 @@ from pathlib import Path
 from typing import Optional, Union, Dict, Any, Tuple
 import httpx
 
+IQ_LABEL_RANGES: Dict[str, Tuple[float, float]] = {
+    "unusable": (0.10, 0.29),
+    "low": (0.30, 0.49),
+    "medium": (0.50, 0.69),
+    "high": (0.70, 0.89),
+    "very high": (0.90, 1.00)
+}
+VALID_IQ_LABELS = set(IQ_LABEL_RANGES.keys())
+
 DEFAULT_FALLBACK_INDEX: Dict[str, Any] = {
     "tag": ["unknown", "unknown", "unknown", "unknown", "unknown"],
     "sdsc": "unknown",
@@ -16,7 +25,9 @@ DEFAULT_FALLBACK_INDEX: Dict[str, Any] = {
     "scn": "unknown",
     "tim": "unknown",
     "evd": [],
-    "cf": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    "cf": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "iq_score": 0.50,
+    "iq_label": "medium"
 }
 
 class VisionIndexingError(Exception):
@@ -136,6 +147,32 @@ class VisionIndexer:
 
         while len(sanitized["cf"]) < 8:
             sanitized["cf"].append(0.0)
+
+        raw_score = parsed.get("iq_score", 0.70)
+        try:
+            iq_score = round(max(0.10, min(1.00, float(raw_score))), 2)
+        except (ValueError, TypeError):
+            iq_score = 0.70
+
+        raw_label = str(parsed.get("iq_label", "")).lower().strip()
+        if raw_label in IQ_LABEL_RANGES:
+            iq_label = raw_label
+            min_s, max_s = IQ_LABEL_RANGES[iq_label]
+            iq_score = round(max(min_s, min(max_s, iq_score)), 2)
+        else:
+            if iq_score < 0.30:
+                iq_label = "unusable"
+            elif iq_score < 0.50:
+                iq_label = "low"
+            elif iq_score < 0.70:
+                iq_label = "medium"
+            elif iq_score < 0.90:
+                iq_label = "high"
+            else:
+                iq_label = "very high"
+
+        sanitized["iq_score"] = iq_score
+        sanitized["iq_label"] = iq_label
 
         return sanitized
 

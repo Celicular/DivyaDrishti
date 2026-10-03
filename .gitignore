@@ -63,5 +63,15 @@ storage/buckets/*
 !storage/buckets/.gitkeep
 test_image*.jpg
 test_image*.png
+test_*.py
+*.test.py
+*.test.js
+*.test.jsx
+*.spec.js
+scratch/
+delhi_tree_plantation_dataset/
 
-
+.agents/
+.agents
+graphify-out/
+graphify-out

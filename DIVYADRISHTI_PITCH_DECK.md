@@ -188,16 +188,16 @@ For quick reference against the original presentation deck (`DivyaDrishti final.
 | Slide | Section Header | Title / Content Summary |
 | :---: | :--- | :--- |
 | **01** | Cover | **DivyaDrishti (DDrishti)** — Dynamic Resource for Intelligent Search, Hosting, and Tracking Initiatives. Code Cubicle 6.0 \| Geek Room. |
-| **02** | 01 / The Hook | *"Thousands of photos. Millions of moments. One moment that matters. Finding it is still almost impossible."* |
-| **03** | 02 / The Problem | *"The evidence exists. Finding it doesn't."* (10,000+ photos, 500+ videos, 40 locations; Find, Verify, Report bottlenecks). |
-| **04** | 03 / The Solution | *"Meet DivyaDrishti — Upload once. Understand everything."* (Understand, Organize, Search, Compare, Report). |
-| **05** | 04 / How It Works | Pipeline: Upload Media ➔ Cloudinary ➔ AI Analysis ➔ Metadata ➔ Semantic Search ➔ Compare & Report. |
-| **06** | 05 / The Wow Feature | *"Ask your evidence"* — Natural-language query demo: Jharkhand water infrastructure Before/After comparison. |
-| **07** | 06 / AI Under the Hood | *"We don't just store the media. We understand it."* (Object, Activity, Location, Time parsing for `IMG_4821.jpg`). |
-| **08** | 07 / Traceability | *"Every insight has a source"* — 14 water systems claim backed by 38 photos, 7 videos, 6 locations. |
-| **09** | 08 / From Evidence to Report | *"One click. From thousands of assets to a report."* Automated Water Access Initiative Impact Report. |
-| **10** | 09 / Who Uses It? | One Shared Evidence Layer across NGOs, Government, Sustainability teams, Donors, and Campaign teams. |
-| **11** | 10 / Tech Stack | System components: React + Vite + Tailwind, FastAPI + SQLite, Cloudinary, Vision AI, Embeddings. |
-| **12** | 11 / Why This Is Different | The Connected Evidence Journey: Upload ➔ Understand ➔ Organize ➔ Search ➔ Compare ➔ Verify ➔ Report. |
-| **13** | 13 / Impact | *"What changes?"* — Direct Before vs. With DivyaDrishti comparison matrix. |
-| **14** | Closing | *"The work already happened. We make it visible. Turn field media into proof."* (Code Cubicle 6.0). |
+| **02** | The Field Reality | *"Thousands of field photos. Zero verifiable structure."* Massive phone and WhatsApp media unorganized without EXIF truth. |
+| **03** | The Problem | *"The evidence exists. Finding and proving it is broken."* Lost GPS/timestamps, manual tagging fatigue, AI synthetic media risks, disconnected audits. |
+| **04** | The Solution | *"Meet DivyaDrishti — Upload once. Understand everything."* Verifiable, geotagged, semantically searchable evidence layer. |
+| **05** | Live Ingestion Pipeline | Local project storage buckets ➔ EXIF & GPS parser ➔ Reverse geocoding ➔ C2PA authenticity guard ➔ Drishti Vision AI ➔ 384-dim semantic embeddings. |
+| **06** | Explore & Semantic Search | *"Ask your evidence"* — Plain English query calculated via cosine similarity over 384-dim semantic metadata vectors. |
+| **07** | Visual Similarity Discovery | Instant semantic clustering across field assets powered by semantic vector distance over AI-derived attributes. |
+| **08** | Telemetry & Provenance Audit | Interactive Lightbox inspector: camera settings, exact GPS coordinates with map link, AI scene tags, and authenticity verification badge. |
+| **09** | Coming Next: Video Analysis | Up Next: Frame-by-frame video & drone intelligence, keyframe extraction, temporal action detection, and in-video semantic search. |
+| **10** | Coming Next: Report Generation | Up Next: One-click verifiable impact reports, automated donor PDF summaries, before/after plates, and clickable evidence citations. |
+| **11** | Coming Next: Poster Generation | Up Next: Automated impact posters & campaign creatives, auto-branded visual assets with verified coordinates and badges for social/print. |
+| **12** | Future Roadmap & Research | Unconfirmed exploratory capabilities: Drone orthomosaic stitching with NDVI vegetation health, offline-first field PWA, multi-stakeholder cryptographic sign-off, satellite cross-verification. |
+| **13** | Live Tech Architecture | Built with modern production tech: React 19, Vite, Tailwind CSS, FastAPI, SQLite, local storage buckets, Drishti Vision AI, 384-dim dense embeddings. |
+| **14** | The Mission | *"The work already happened. We make it visible and provable."* Code Cubicle 6.0 \| Geek Room. |

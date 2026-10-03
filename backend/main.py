@@ -29,7 +29,9 @@ try:
         delete_media_asset,
         batch_update_media_assets,
         batch_delete_media_assets,
-        get_image_ai_inference
+        get_image_ai_inference,
+        mark_images_for_reindex,
+        search_explore_assets
     )
     from backend.auth import verify_password, create_access_token, decode_access_token
     from backend.models import (
@@ -45,16 +47,19 @@ try:
         MediaUpdateRequest,
         MediaBatchUpdateRequest,
         MediaBatchDeleteRequest,
+        MediaBatchReindexRequest,
         ReverseGeocodeResponse,
-        IndexingStatusResponse
+        IndexingStatusResponse,
+        ExploreSearchRequest,
+        ExploreSearchResponse
     )
     from backend.services.metadata_extractor import process_and_extract_metadata
     from backend.services.geocoder import reverse_geocode
     from backend.services.ai_indexing_worker import get_indexing_worker
+    from backend.services.embedding_service import get_embedding_engine
 except ImportError:
     from config import BUCKETS_DIR, GEMMA_INTERNAL_URL
     from database import (
-
         init_db,
         get_user_by_identity,
         get_user_by_id,
@@ -71,7 +76,9 @@ except ImportError:
         delete_media_asset,
         batch_update_media_assets,
         batch_delete_media_assets,
-        get_image_ai_inference
+        get_image_ai_inference,
+        mark_images_for_reindex,
+        search_explore_assets
     )
     from auth import verify_password, create_access_token, decode_access_token
     from models import (
@@ -87,16 +94,26 @@ except ImportError:
         MediaUpdateRequest,
         MediaBatchUpdateRequest,
         MediaBatchDeleteRequest,
+        MediaBatchReindexRequest,
         ReverseGeocodeResponse,
-        IndexingStatusResponse
+        IndexingStatusResponse,
+        ExploreSearchRequest,
+        ExploreSearchResponse
     )
     from services.metadata_extractor import process_and_extract_metadata
     from services.geocoder import reverse_geocode
     from services.ai_indexing_worker import get_indexing_worker
+    from services.embedding_service import get_embedding_engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    import asyncio
+    engine = get_embedding_engine()
+    try:
+        await asyncio.to_thread(engine.load_model)
+    except Exception:
+        pass
     worker = get_indexing_worker()
     worker.start()
     await worker.hydrate_unindexed_from_db()
@@ -512,6 +529,83 @@ def batch_delete_project_images(project_id: int, request: MediaBatchDeleteReques
         except Exception:
             pass
     return {"success": True, "deleted_count": len(deleted_assets), "message": f"{len(deleted_assets)} images deleted successfully"}
+
+@app.post("/api/projects/{project_id}/images/batch-reindex", tags=["AI"])
+async def batch_reindex_images_endpoint(project_id: int, request: MediaBatchReindexRequest, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    project = get_project_by_id(project_id)
+    if not project or project["uid"] != user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    target_assets = mark_images_for_reindex(request.image_ids, project_id, user["id"])
+    if not target_assets:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No matching images found for reindexing"
+        )
+    worker = get_indexing_worker()
+    enqueued_count = await worker.batch_reindex_images(target_assets)
+    return {
+        "success": True,
+        "reindexed_count": enqueued_count,
+        "message": f"{enqueued_count} images queued for priority reindexing"
+    }
+
+@app.post("/api/media/batch-reindex", tags=["AI"])
+async def batch_reindex_cross_project_endpoint(
+    request: MediaBatchReindexRequest,
+    authorization: Optional[str] = Header(None)
+):
+    user = get_current_user(authorization)
+    target_assets = mark_images_for_reindex(request.image_ids, None, user["id"])
+    if not target_assets:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No matching images found for reindexing"
+        )
+    worker = get_indexing_worker()
+    enqueued_count = await worker.batch_reindex_images(target_assets)
+    return {
+        "success": True,
+        "reindexed_count": enqueued_count,
+        "message": f"{enqueued_count} images queued for priority reindexing"
+    }
+
+@app.post("/api/search/explore", response_model=ExploreSearchResponse, tags=["Search"])
+async def explore_search_endpoint(
+    request: ExploreSearchRequest,
+    authorization: Optional[str] = Header(None)
+):
+    user = get_current_user(authorization)
+    query_vector = None
+    if request.query and request.query.strip():
+        try:
+            engine = get_embedding_engine()
+            query_vector = engine.generate_query_embedding(request.query)
+        except Exception:
+            query_vector = None
+
+    search_data = search_explore_assets(
+        uid=user["id"],
+        project_ids=request.project_ids,
+        query_vector=query_vector,
+        similar_to_image_id=request.similar_to_image_id,
+        tim=request.tim,
+        iq_label=request.iq_label,
+        min_iq_score=request.min_iq_score,
+        scn=request.scn,
+        sort_by=request.sort_by,
+        limit=request.limit,
+        offset=request.offset
+    )
+
+    return ExploreSearchResponse(
+        total_matches=search_data["total_matches"],
+        results=search_data["results"],
+        facets=search_data["facets"]
+    )
 
 @app.get("/api/geo/reverse", response_model=ReverseGeocodeResponse, tags=["Geo"])
 @app.get("/geo/reverse", response_model=ReverseGeocodeResponse, tags=["Geo"])

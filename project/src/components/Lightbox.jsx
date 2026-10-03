@@ -635,6 +635,51 @@ export default function Lightbox({
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">
+                    <div className="p-3 rounded-xl border border-[#e7e3da] bg-[#faf9f6]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c]">
+                          Image Quality
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize ${
+                            aiData?.iq_label === 'unusable'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                              : aiData?.iq_label === 'low'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : aiData?.iq_label === 'medium'
+                              ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                              : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                          }`}
+                        >
+                          {aiData?.iq_label || 'Good'} • {Math.round((aiData?.iq_score || 0.75) * 100)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#e7e3da] rounded-full overflow-hidden mt-2">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            aiData?.iq_label === 'unusable'
+                              ? 'bg-rose-500'
+                              : aiData?.iq_label === 'low'
+                              ? 'bg-amber-500'
+                              : aiData?.iq_label === 'medium'
+                              ? 'bg-sky-500'
+                              : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.round((aiData?.iq_score || 0.75) * 100)}%` }}
+                        />
+                      </div>
+                      {(aiData?.iq_label === 'unusable' || aiData?.iq_label === 'low') && (
+                        <p className="mt-2 text-[11px] text-amber-800 flex items-center gap-1.5">
+                          <AlertTriangle size={13} className="shrink-0 text-amber-600" />
+                          <span>
+                            {aiData?.iq_label === 'unusable'
+                              ? 'Severe blur or corruption detected. Flagged for site recapture.'
+                              : 'Degraded visibility or motion blur may affect feature confidence.'}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+
                     {aiData?.tag?.length > 0 && (
                       <div>
                         <span className="text-[11px] uppercase tracking-wider font-semibold text-[#5b655c] block pb-1.5 border-b border-[#eeebe3]">

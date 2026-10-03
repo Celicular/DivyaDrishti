@@ -16,6 +16,7 @@ try:
         get_media_asset_by_id
     )
     from backend.services.vision_indexer import VisionIndexer, VisionIndexingError
+    from backend.services.embedding_service import get_embedding_engine
 except ImportError:
     from config import BUCKETS_DIR, STORAGE_DIR, EXTERNAL_AI_URL
     from database import (
@@ -25,6 +26,7 @@ except ImportError:
         get_media_asset_by_id
     )
     from services.vision_indexer import VisionIndexer, VisionIndexingError
+    from services.embedding_service import get_embedding_engine
 
 def prepare_compressed_inference_bytes(image_path: Path, max_dimension: int = 1600, quality: int = 82) -> bytes:
     with Image.open(image_path) as img:
@@ -117,6 +119,19 @@ class AIIndexingWorker:
         await self.enqueue_image(image_id=image_id, project_id=project_id, file_name=resolved_file, is_priority=True)
         return True
 
+    async def batch_reindex_images(self, assets: List[Dict[str, Any]]) -> int:
+        enqueued_count = 0
+        for asset in assets:
+            await self.enqueue_image(
+                image_id=asset["id"],
+                project_id=asset["project_id"],
+                file_name=asset["file_name"],
+                is_priority=True
+            )
+            enqueued_count += 1
+        self.wakeup_event.set()
+        return enqueued_count
+
     async def hydrate_unindexed_from_db(self, project_id: Optional[int] = None) -> int:
         unindexed = get_unindexed_media_assets(project_id)
         enqueued_count = 0
@@ -171,6 +186,14 @@ class AIIndexingWorker:
                 image_input=compressed_bytes,
                 enable_thinking=False
             )
+            try:
+                engine = get_embedding_engine()
+                passage = engine.build_evidence_passage(extracted_data)
+                vector = await asyncio.to_thread(engine.generate_embedding, passage)
+                extracted_data["embedding"] = vector
+            except Exception:
+                extracted_data["embedding"] = None
+
             save_image_ai_inference(
                 project_id=project_id,
                 image_id=image_id,

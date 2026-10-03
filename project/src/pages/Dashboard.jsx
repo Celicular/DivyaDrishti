@@ -31,7 +31,10 @@ import {
   Check,
   AlertCircle,
   CheckSquare,
-  Square
+  Square,
+  Compass,
+  Search,
+  RotateCcw
 } from 'lucide-react'
 import { getCurrentUser, getAuthToken, logout } from '../api/auth'
 import { getProjects, createProject, updateProject, deleteProject } from '../api/projects'
@@ -42,12 +45,14 @@ import {
   deleteImage,
   batchUpdateImages,
   batchDeleteImages,
+  batchReindexImages,
   getMediaUrl,
   reverseGeocode,
   getIndexingStatus
 } from '../api/media'
 import Lightbox from '../components/Lightbox'
 import IndexingStatusBar from '../components/IndexingStatusBar'
+import ExploreView from '../components/ExploreView'
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return ''
@@ -128,6 +133,7 @@ export default function Dashboard() {
   const [isQueueProcessing, setIsQueueProcessing] = useState(false)
 
   const [lightboxIndex, setLightboxIndex] = useState(null)
+  const [exploreLightbox, setExploreLightbox] = useState({ isOpen: false, images: [], index: 0 })
   const [editImageTarget, setEditImageTarget] = useState(null)
   const [editImageName, setEditImageName] = useState('')
   const [savingImageName, setSavingImageName] = useState(false)
@@ -140,7 +146,10 @@ export default function Dashboard() {
   const [savingBatchRename, setSavingBatchRename] = useState(false)
   const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false)
   const [deletingBatch, setDeletingBatch] = useState(false)
+  const [reindexingBatch, setReindexingBatch] = useState(false)
   const [resolvedLocations, setResolvedLocations] = useState({})
+  const [exploreQuery, setExploreQuery] = useState('')
+  const [exploreFilter, setExploreFilter] = useState('all')
 
   const fileInputRef = useRef(null)
   const queueRef = useRef([])
@@ -554,6 +563,33 @@ export default function Dashboard() {
     }
   }
 
+  const handleBatchReindex = async () => {
+    if (!openFolderId || selectedImageIds.length === 0 || reindexingBatch) return
+    setReindexingBatch(true)
+
+    const targetIds = [...selectedImageIds]
+    setProjectMedia((prev) =>
+      prev.map((item) =>
+        targetIds.includes(item.id)
+          ? { ...item, is_ai_indexed: false, ai_inference: null }
+          : item
+      )
+    )
+
+    const res = await batchReindexImages(openFolderId, targetIds)
+    setReindexingBatch(false)
+    if (res.success) {
+      setSelectedImageIds([])
+      const statusRes = await getIndexingStatus(openFolderId)
+      if (statusRes.success && statusRes.data) {
+        setIndexingStatus(statusRes.data)
+      }
+    } else {
+      alert(res.error || 'Failed to reindex selected images')
+      loadMediaForFolder(openFolderId)
+    }
+  }
+
   const sortedMedia = useMemo(() => {
     const list = [...projectMedia]
     switch (sortOption) {
@@ -687,6 +723,16 @@ export default function Dashboard() {
 
           <button
             type="button"
+            onClick={() => setActiveScreen('explore')}
+            className={`nav-item ${activeScreen === 'explore' ? 'is-active' : ''}`}
+            title="Explore"
+          >
+            <Compass size={20} className="nav-icon" />
+            {!isCollapsed && <span className="nav-label">Explore</span>}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveScreen('add-files')}
             className={`nav-item ${activeScreen === 'add-files' ? 'is-active' : ''}`}
             title="Add files"
@@ -725,10 +771,10 @@ export default function Dashboard() {
         <header className="content-topbar">
           <div className="topbar-left">
             <span className="breadcrumb-path">
-              Workspace / {activeScreen === 'dashboard' ? 'Projects & Overview' : 'Drive Storage'}
+              Workspace / {activeScreen === 'dashboard' ? 'Projects & Overview' : activeScreen === 'explore' ? 'Visual Evidence & Search' : 'Drive Storage'}
             </span>
             <h1 className="screen-heading">
-              {activeScreen === 'dashboard' ? 'Dashboard' : 'Add files'}
+              {activeScreen === 'dashboard' ? 'Dashboard' : activeScreen === 'explore' ? 'Explore' : 'Add files'}
             </h1>
           </div>
 
@@ -1048,6 +1094,23 @@ export default function Dashboard() {
                       <div className="batch-action-right">
                         <button
                           type="button"
+                          onClick={handleBatchReindex}
+                          disabled={reindexingBatch}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#006b49] hover:bg-[#005238] disabled:bg-[#7cbba4] text-white shadow-xs transition-colors cursor-pointer"
+                          title="Purge visual features and reindex with Vision AI"
+                        >
+                          {reindexingBatch ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" /> Reindexing...
+                            </>
+                          ) : (
+                            <>
+                              <RotateCcw size={14} /> Reindex ({selectedImageIds.length})
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
                           onClick={handleOpenBatchRename}
                           className="button button-small batch-rename-btn"
                         >
@@ -1187,14 +1250,28 @@ export default function Dashboard() {
                                       loading="lazy"
                                     />
 
-                                    {!isItemIndexed && (
+                                    {!isItemIndexed ? (
                                       <span
                                         className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#161c17]/85 text-amber-300 border border-amber-500/30 shadow-xs pointer-events-none z-10"
                                         title="Queued for visual evidence indexing"
                                       >
                                         Pending AI
                                       </span>
-                                    )}
+                                    ) : item.ai_inference?.iq_label === 'unusable' ? (
+                                      <span
+                                        className="absolute top-2 left-2 z-10 text-[10px] font-bold text-white bg-rose-600 px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-sm tracking-wide pointer-events-none"
+                                        title={`Image Quality: Unusable (${Math.round((item.ai_inference.iq_score || 0.1) * 100)}%)`}
+                                      >
+                                        <AlertTriangle size={11} /> Unusable
+                                      </span>
+                                    ) : item.ai_inference?.iq_label === 'low' ? (
+                                      <span
+                                        className="absolute top-2 left-2 z-10 text-[10px] font-bold text-white bg-amber-600 px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-sm tracking-wide pointer-events-none"
+                                        title={`Image Quality: Low (${Math.round((item.ai_inference.iq_score || 0.4) * 100)}%)`}
+                                      >
+                                        <AlertTriangle size={11} /> Low Quality
+                                      </span>
+                                    ) : null}
 
                                     <button
                                       type="button"
@@ -1286,6 +1363,14 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+          )}
+
+          {activeScreen === 'explore' && (
+            <ExploreView
+              projects={projects}
+              user={user}
+              onOpenLightbox={(imgs, idx) => setExploreLightbox({ isOpen: true, images: imgs, index: idx })}
+            />
           )}
         </div>
       </main>
@@ -1465,6 +1550,19 @@ export default function Dashboard() {
               }
             }
           }}
+        />
+      )}
+
+      {exploreLightbox.isOpen && (
+        <Lightbox
+          images={exploreLightbox.images}
+          currentIndex={exploreLightbox.index}
+          resolvedLocations={resolvedLocations}
+          onClose={() => setExploreLightbox({ isOpen: false, images: [], index: 0 })}
+          onNavigate={(newIdx) => setExploreLightbox((prev) => ({ ...prev, index: newIdx }))}
+          onUpdateDisplayName={handleUpdateImageName}
+          onDeleteImage={handleDeleteImage}
+          onForceIndex={async () => {}}
         />
       )}
 

@@ -121,6 +121,21 @@ export async function batchDeleteImages(projectId, imageIds) {
   }
 }
 
+export async function batchReindexImages(projectId, imageIds) {
+  try {
+    const response = await apiClient.post(`/projects/${projectId}/images/batch-reindex`, {
+      image_ids: imageIds
+    })
+    return { success: true, data: response.data }
+  } catch (error) {
+    const message =
+      error.response?.data?.detail ||
+      error.message ||
+      'Failed to batch reindex images'
+    return { success: false, error: message }
+  }
+}
+
 export async function reverseGeocode(latitude, longitude) {
   if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
     return { success: false, error: 'Invalid coordinates' }
@@ -165,6 +180,33 @@ export async function getImageAiData(projectId, imageId) {
     return { success: true, data: response.data }
   } catch (error) {
     const message = error.response?.data?.detail || error.message || 'Failed to fetch AI data'
+    return { success: false, error: message }
+  }
+}
+
+export async function searchExplore(searchPayload, abortSignal = null) {
+  try {
+    const response = await apiClient.post('/search/explore', searchPayload, {
+      signal: abortSignal
+    })
+    return { success: true, data: response.data }
+  } catch (error) {
+    if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      return { success: false, isCanceled: true }
+    }
+    const message = error.response?.data?.detail || error.message || 'Failed to search media'
+    return { success: false, error: message }
+  }
+}
+
+export async function batchReindexCrossProject(imageIds) {
+  try {
+    const response = await apiClient.post('/media/batch-reindex', {
+      image_ids: imageIds
+    })
+    return { success: true, data: response.data }
+  } catch (error) {
+    const message = error.response?.data?.detail || error.message || 'Failed to batch reindex images'
     return { success: false, error: message }
   }
 }

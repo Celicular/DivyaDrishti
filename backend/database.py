@@ -210,6 +210,9 @@ def _format_media_row(conn: sqlite3.Connection, asset_dict: Dict[str, Any]) -> D
                     ai_dict[key] = json.loads(ai_dict[key])
                 except Exception:
                     ai_dict[key] = []
+        if isinstance(ai_dict.get("embedding"), (bytes, bytearray)):
+            ai_dict["has_embedding"] = True
+            del ai_dict["embedding"]
         asset_dict["ai_inference"] = ai_dict
     else:
         asset_dict["ai_inference"] = None
@@ -390,12 +393,29 @@ def save_image_ai_inference(project_id: int, image_id: int, ai_data: Dict[str, A
     tim_str = str(ai_data.get("tim", "unknown")).strip()
     evd_str = json.dumps(ai_data.get("evd", []))
     cf_str = json.dumps(ai_data.get("cf", []))
+    iq_score = float(ai_data.get("iq_score", 0.70))
+    iq_label = str(ai_data.get("iq_label", "medium")).strip().lower()
+
+    raw_embed = ai_data.get("embedding")
+    embedding_bytes = None
+    embedding_json_str = None
+    if raw_embed is not None:
+        if isinstance(raw_embed, (bytes, bytearray)):
+            embedding_bytes = bytes(raw_embed)
+        elif hasattr(raw_embed, "tobytes"):
+            embedding_bytes = raw_embed.tobytes()
+            embedding_json_str = json.dumps(raw_embed.tolist())
+        elif isinstance(raw_embed, list):
+            import numpy as np
+            embedding_bytes = np.array(raw_embed, dtype=np.float32).tobytes()
+            embedding_json_str = json.dumps(raw_embed)
 
     cursor.execute(
         """
         INSERT INTO images_ai_inference (
-            project_id, image_id, tag, sdsc, ddsc, obj, act, scn, tim, evd, cf
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            project_id, image_id, tag, sdsc, ddsc, obj, act, scn, tim, evd, cf,
+            iq_score, iq_label, embedding, embedding_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(image_id) DO UPDATE SET
             tag = excluded.tag,
             sdsc = excluded.sdsc,
@@ -406,9 +426,16 @@ def save_image_ai_inference(project_id: int, image_id: int, ai_data: Dict[str, A
             tim = excluded.tim,
             evd = excluded.evd,
             cf = excluded.cf,
+            iq_score = excluded.iq_score,
+            iq_label = excluded.iq_label,
+            embedding = excluded.embedding,
+            embedding_json = excluded.embedding_json,
             updated_at = CURRENT_TIMESTAMP
         """,
-        (project_id, image_id, tag_str, sdsc_str, ddsc_str, obj_str, act_str, scn_str, tim_str, evd_str, cf_str)
+        (
+            project_id, image_id, tag_str, sdsc_str, ddsc_str, obj_str, act_str, scn_str, tim_str, evd_str, cf_str,
+            iq_score, iq_label, embedding_bytes, embedding_json_str
+        )
     )
     cursor.execute("UPDATE media_assets SET is_ai_indexed = 1 WHERE id = ?", (image_id,))
     conn.commit()
@@ -423,6 +450,9 @@ def save_image_ai_inference(project_id: int, image_id: int, ai_data: Dict[str, A
                     res[key] = json.loads(res[key])
                 except Exception:
                     res[key] = []
+        if isinstance(res.get("embedding"), (bytes, bytearray)):
+            res["has_embedding"] = True
+            del res["embedding"]
         return res
     return ai_data
 
@@ -441,7 +471,54 @@ def get_image_ai_inference(image_id: int) -> Optional[Dict[str, Any]]:
                 res[key] = json.loads(res[key])
             except Exception:
                 res[key] = []
+    if isinstance(res.get("embedding"), (bytes, bytearray)):
+        res["has_embedding"] = True
+        del res["embedding"]
     return res
+
+def mark_images_for_reindex(image_ids: List[int], project_id: Optional[int], uid: int) -> List[Dict[str, Any]]:
+    if not image_ids:
+        return []
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" for _ in image_ids)
+    if project_id is not None:
+        cursor.execute(
+            f"""
+            SELECT id, project_id, file_name, display_name
+            FROM media_assets
+            WHERE project_id = ? AND uid = ? AND id IN ({placeholders})
+            """,
+            [project_id, uid] + image_ids
+        )
+    else:
+        cursor.execute(
+            f"""
+            SELECT id, project_id, file_name, display_name
+            FROM media_assets
+            WHERE uid = ? AND id IN ({placeholders})
+            """,
+            [uid] + image_ids
+        )
+    target_assets = [dict(r) for r in cursor.fetchall()]
+    if not target_assets:
+        conn.close()
+        return []
+
+    valid_ids = [a["id"] for a in target_assets]
+    valid_placeholders = ",".join("?" for _ in valid_ids)
+
+    cursor.execute(
+        f"UPDATE media_assets SET is_ai_indexed = 0 WHERE id IN ({valid_placeholders})",
+        valid_ids
+    )
+    cursor.execute(
+        f"DELETE FROM images_ai_inference WHERE image_id IN ({valid_placeholders})",
+        valid_ids
+    )
+    conn.commit()
+    conn.close()
+    return target_assets
 
 def get_unindexed_media_assets(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
@@ -474,4 +551,250 @@ def get_project_indexing_counts(project_id: int) -> Dict[str, int]:
         "indexed": indexed,
         "pending": max(0, total - indexed)
     }
+
+def search_explore_assets(
+    uid: int,
+    project_ids: Optional[List[int]] = None,
+    query_vector: Optional[Any] = None,
+    similar_to_image_id: Optional[int] = None,
+    tim: Optional[str] = None,
+    iq_label: Optional[str] = None,
+    min_iq_score: Optional[float] = None,
+    scn: Optional[str] = None,
+    sort_by: Optional[str] = "relevance",
+    limit: int = 100,
+    offset: int = 0
+) -> Dict[str, Any]:
+    import numpy as np
+
+    user_projects = list_projects(uid=uid)
+    user_project_ids = {p["id"] for p in user_projects}
+    project_name_map = {p["id"]: p["project_name"] for p in user_projects}
+
+    if project_ids:
+        target_project_ids = [pid for pid in project_ids if pid in user_project_ids]
+    else:
+        target_project_ids = list(user_project_ids)
+
+    if not target_project_ids:
+        return {
+            "total_matches": 0,
+            "results": [],
+            "facets": {
+                "tim_counts": {},
+                "iq_counts": {},
+                "project_counts": {},
+                "total_with_gps": 0
+            }
+        }
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if similar_to_image_id is not None and query_vector is None:
+        cursor.execute(
+            "SELECT id, tag, sdsc, ddsc, obj, act, scn, tim, evd, iq_label, embedding FROM images_ai_inference WHERE image_id = ?",
+            (similar_to_image_id,)
+        )
+        sim_row = cursor.fetchone()
+        if sim_row:
+            if sim_row["embedding"]:
+                query_vector = np.frombuffer(sim_row["embedding"], dtype=np.float32)
+            else:
+                try:
+                    from backend.services.embedding_service import get_embedding_engine
+                except ImportError:
+                    from services.embedding_service import get_embedding_engine
+                eng = get_embedding_engine()
+                row_data = dict(sim_row)
+                for k in ("tag", "obj", "act", "evd"):
+                    if isinstance(row_data.get(k), str):
+                        try:
+                            row_data[k] = json.loads(row_data[k])
+                        except Exception:
+                            row_data[k] = [s.strip() for s in row_data[k].split(",") if s.strip()]
+                    elif row_data.get(k) is None:
+                        row_data[k] = []
+                passage = eng.build_evidence_passage(row_data)
+                query_vector = eng.generate_embedding(passage)
+                cursor.execute(
+                    "UPDATE images_ai_inference SET embedding = ?, embedding_json = ? WHERE id = ?",
+                    (query_vector.tobytes(), json.dumps(query_vector.tolist()), row_data["id"])
+                )
+                conn.commit()
+
+    placeholders = ",".join("?" for _ in target_project_ids)
+    sql = f"""
+    SELECT 
+        m.id, m.project_id, m.uid, m.file_name, m.original_file_name, m.display_name,
+        m.image_url, m.thumbnail_url, m.file_size, m.mime_type, m.upload_time,
+        m.captured_at, m.is_ai_indexed,
+        ai.iq_score, ai.iq_label, ai.tim, ai.scn, ai.tag, ai.obj, ai.act, ai.sdsc, ai.ddsc, ai.evd,
+        ai.embedding,
+        meta.latitude, meta.longitude, meta.location_name
+    FROM media_assets m
+    LEFT JOIN images_ai_inference ai ON m.id = ai.image_id
+    LEFT JOIN image_metadata meta ON m.id = meta.image_id
+    WHERE m.uid = ? AND m.project_id IN ({placeholders})
+    """
+    params: List[Any] = [uid] + target_project_ids
+
+    if tim and tim.lower() not in ("all", ""):
+        sql += " AND LOWER(ai.tim) = ?"
+        params.append(tim.lower().strip())
+
+    if iq_label and iq_label.lower() not in ("all", ""):
+        sql += " AND LOWER(ai.iq_label) = ?"
+        params.append(iq_label.lower().strip())
+
+    if min_iq_score is not None:
+        sql += " AND ai.iq_score >= ?"
+        params.append(float(min_iq_score))
+
+    if scn and scn.strip():
+        sql += " AND LOWER(ai.scn) LIKE ?"
+        params.append(f"%{scn.strip().lower()}%")
+
+    if similar_to_image_id is not None:
+        sql += " AND m.id != ?"
+        params.append(similar_to_image_id)
+
+    cursor.execute(sql, params)
+    raw_rows = cursor.fetchall()
+    conn.close()
+
+    items = []
+    tim_counts: Dict[str, int] = {}
+    iq_counts: Dict[str, int] = {}
+    project_counts: Dict[str, int] = {}
+    total_with_gps = 0
+
+    candidate_embeddings = []
+    candidate_items = []
+
+    for r in raw_rows:
+        row_dict = dict(r)
+        pid = row_dict["project_id"]
+        row_dict["project_name"] = project_name_map.get(pid, "")
+
+        for field in ("tag", "obj", "act", "evd"):
+            val = row_dict.get(field)
+            if isinstance(val, str):
+                try:
+                    row_dict[field] = json.loads(val)
+                except Exception:
+                    row_dict[field] = [s.strip() for s in val.split(",") if s.strip()]
+            elif val is None:
+                row_dict[field] = []
+
+        raw_tim = (row_dict.get("tim") or "unknown").strip().lower()
+        tim_counts[raw_tim] = tim_counts.get(raw_tim, 0) + 1
+
+        raw_iq = (row_dict.get("iq_label") or "unknown").strip().lower()
+        iq_counts[raw_iq] = iq_counts.get(raw_iq, 0) + 1
+
+        pid_key = str(pid)
+        project_counts[pid_key] = project_counts.get(pid_key, 0) + 1
+
+        if row_dict.get("latitude") is not None and row_dict.get("longitude") is not None:
+            total_with_gps += 1
+
+        emb_bytes = row_dict.get("embedding")
+        if "embedding" in row_dict:
+            del row_dict["embedding"]
+
+        if emb_bytes and len(emb_bytes) >= 1536:
+            row_dict["has_embedding"] = True
+            candidate_embeddings.append(np.frombuffer(emb_bytes, dtype=np.float32))
+            candidate_items.append(row_dict)
+        else:
+            row_dict["has_embedding"] = False
+            row_dict["similarity_score"] = None
+            items.append(row_dict)
+
+    if query_vector is not None and candidate_embeddings:
+        q_norm = query_vector / (np.linalg.norm(query_vector) + 1e-9)
+        cand_matrix = np.vstack(candidate_embeddings)
+        norms = np.linalg.norm(cand_matrix, axis=1, keepdims=True) + 1e-9
+        cand_matrix_norm = cand_matrix / norms
+        sims = np.dot(cand_matrix_norm, q_norm)
+        for idx, item in enumerate(candidate_items):
+            score = float(sims[idx])
+            item["similarity_score"] = round(max(0.0, min(1.0, score)), 4)
+            items.append(item)
+    else:
+        for item in items:
+            item["similarity_score"] = None
+        for item in candidate_items:
+            item["similarity_score"] = None
+            items.append(item)
+
+    if query_vector is not None and (not sort_by or sort_by == "relevance"):
+        items.sort(key=lambda x: x.get("similarity_score") or 0.0, reverse=True)
+    elif sort_by == "quality_desc":
+        items.sort(key=lambda x: x.get("iq_score") or 0.0, reverse=True)
+    elif sort_by == "quality_asc":
+        items.sort(key=lambda x: x.get("iq_score") or 0.0)
+    elif sort_by == "oldest":
+        items.sort(key=lambda x: str(x.get("upload_time") or x.get("captured_at") or ""))
+    elif sort_by == "relevance":
+        items.sort(key=lambda x: x.get("similarity_score") or 0.0, reverse=True)
+    else:
+        items.sort(key=lambda x: str(x.get("upload_time") or x.get("captured_at") or ""), reverse=True)
+
+    total_matches = len(items)
+    sliced_results = items[offset : offset + limit]
+
+    return {
+        "total_matches": total_matches,
+        "results": sliced_results,
+        "facets": {
+            "tim_counts": tim_counts,
+            "iq_counts": iq_counts,
+            "project_counts": project_counts,
+            "total_with_gps": total_with_gps
+        }
+    }
+
+def backfill_missing_embeddings() -> int:
+    try:
+        from backend.services.embedding_service import get_embedding_engine
+    except ImportError:
+        from services.embedding_service import get_embedding_engine
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, tag, sdsc, ddsc, obj, act, scn, tim, evd, iq_label FROM images_ai_inference WHERE embedding IS NULL")
+    rows = cursor.fetchall()
+    if not rows:
+        conn.close()
+        return 0
+
+    engine = get_embedding_engine()
+    count = 0
+    for r in rows:
+        ai_data = dict(r)
+        for key in ("tag", "obj", "act", "evd"):
+            val = ai_data.get(key)
+            if isinstance(val, str):
+                try:
+                    ai_data[key] = json.loads(val)
+                except Exception:
+                    ai_data[key] = [s.strip() for s in val.split(",") if s.strip()]
+            elif val is None:
+                ai_data[key] = []
+
+        passage = engine.build_evidence_passage(ai_data)
+        vec = engine.generate_embedding(passage)
+        emb_bytes = vec.tobytes()
+        emb_json = json.dumps(vec.tolist())
+        cursor.execute(
+            "UPDATE images_ai_inference SET embedding = ?, embedding_json = ? WHERE id = ?",
+            (emb_bytes, emb_json, ai_data["id"])
+        )
+        count += 1
+
+    conn.commit()
+    conn.close()
+    return count
 

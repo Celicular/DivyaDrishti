@@ -16,3 +16,6 @@ storage/buckets/*
 data/
 *.gguf
 gemma/models/*/*.gguf
+test_*.py
+*.test.py
+scratch/
