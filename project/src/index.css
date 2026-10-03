@@ -671,6 +671,30 @@ body:has(dialog[open]) { overflow: hidden; }
 .badge-quality-unusable { position: absolute; top: 8px; left: 8px; z-index: 10; font-size: 10px; font-weight: 700; color: #ffffff; background: #dc2626; padding: 2px 7px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4); letter-spacing: 0.02em; pointer-events: none; }
 .badge-quality-low { position: absolute; top: 8px; left: 8px; z-index: 10; font-size: 10px; font-weight: 700; color: #ffffff; background: #d97706; padding: 2px 7px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217, 119, 6, 0.4); letter-spacing: 0.02em; pointer-events: none; }
 
+@media print {
+  .dashboard-sidebar,
+  .content-topbar,
+  .modal-backdrop,
+  .sidebar-top,
+  .sidebar-bottom,
+  .collapse-toggle-btn {
+    display: none !important;
+  }
+  .dashboard-shell {
+    display: block !important;
+    background: transparent !important;
+  }
+  .dashboard-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .screen-container {
+    padding: 0 !important;
+  }
+}
+
 
 
 

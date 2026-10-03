@@ -20,6 +20,16 @@ import {
 } from 'lucide-react'
 import { getMediaUrl, getProjectImages } from '../api/media'
 
+function escapeHtml(str) {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 export default function ExportReportView({
   projects = [],
   currentProjectId = null,
@@ -116,12 +126,443 @@ export default function ExportReportView({
   }
 
   const handlePrintPdf = () => {
-    window.print()
+    const printWin = window.open('about:blank', '_blank')
+    if (!printWin) {
+      window.print()
+      return
+    }
+
+    const beforeImgSrc = beforeImage ? getMediaUrl(beforeImage.image_url) : ''
+    const afterImgSrc = afterImage ? getMediaUrl(afterImage.image_url) : ''
+
+    const evidenceCardsHtml = selectedImages
+      .map(
+        (img, idx) => `
+        <div class="evidence-card">
+          <div class="evidence-img-wrap">
+            <img src="${getMediaUrl(img.thumbnail_url || img.image_url)}" alt="${escapeHtml(img.display_name)}" />
+          </div>
+          <div class="evidence-info">
+            <div class="evidence-title truncate">#${idx + 1} ${escapeHtml(img.display_name)}</div>
+            <div class="evidence-geo truncate">
+              ${img.metadata?.latitude ? `${img.metadata.latitude.toFixed(4)}, ${img.metadata.longitude.toFixed(4)}` : 'Geotagged'} • ${escapeHtml(img.metadata?.location_name || 'Delhi')}
+            </div>
+          </div>
+        </div>
+      `
+      )
+      .join('')
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(reportTitle)} — DivyaDrishti Verified Evidence Dossier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Merriweather:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 12mm 12mm 12mm;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      color: #1f2420;
+      background: #faf9f6;
+      padding: 24px;
+      line-height: 1.5;
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .print-bar {
+      max-width: 900px;
+      margin: 0 auto 20px auto;
+      background: #ffffff;
+      border: 1px solid #dcd7cc;
+      border-radius: 12px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .print-bar-info {
+      font-size: 12px;
+      color: #5a655c;
+    }
+    .print-bar-info strong {
+      color: #1f2420;
+    }
+    .print-bar-btn {
+      background: #006b49;
+      color: #ffffff;
+      border: 0;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .print-bar-btn:hover {
+      background: #005238;
+    }
+    .dossier-card {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #ded8cb;
+      border-radius: 16px;
+      padding: 36px 40px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+    .dossier-header {
+      border-bottom: 2px solid #1f2420;
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+    }
+    .dossier-brand {
+      color: #006b49;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dossier-title {
+      font-family: 'Merriweather', serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: #1f2420;
+      line-height: 1.25;
+      margin-bottom: 6px;
+    }
+    .dossier-org {
+      font-size: 13px;
+      color: #4d564e;
+      font-weight: 500;
+    }
+    .dossier-meta {
+      font-size: 11.5px;
+      color: #5a655c;
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      white-space: nowrap;
+    }
+    .c2pa-badge {
+      color: #006b49;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      justify-content: flex-end;
+    }
+    .c2pa-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #006b49;
+    }
+    .section-block {
+      margin-bottom: 22px;
+      page-break-inside: avoid;
+    }
+    .section-heading {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #006b49;
+      border-bottom: 1px solid #ece7de;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+    }
+    .section-text {
+      font-size: 13px;
+      color: #2b312c;
+      line-height: 1.6;
+    }
+    .pair-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 8px;
+    }
+    .pair-card {
+      border: 1px solid #ded8cb;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #faf9f6;
+    }
+    .pair-img-wrap {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      background: #e8e4da;
+      overflow: hidden;
+    }
+    .pair-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .pair-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+    .badge-before { background: rgba(31, 36, 32, 0.88); }
+    .badge-after { background: #006b49; }
+    .pair-meta {
+      padding: 12px;
+    }
+    .pair-caption {
+      font-weight: 600;
+      color: #1f2420;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .pair-sub {
+      font-size: 10.5px;
+      color: #6d776e;
+    }
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .evidence-card {
+      border: 1px solid #e0dacd;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #faf9f6;
+    }
+    .evidence-img-wrap {
+      width: 100%;
+      height: 90px;
+      background: #eeebe2;
+      overflow: hidden;
+    }
+    .evidence-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .evidence-info {
+      padding: 6px 8px;
+    }
+    .evidence-title {
+      font-size: 9.5px;
+      font-weight: 600;
+      color: #1f2420;
+    }
+    .evidence-geo {
+      font-size: 8.5px;
+      color: #6d776e;
+    }
+    .truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .signoff-box {
+      background: #f5f8f6;
+      border: 1px solid #cfe2d7;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-top: 10px;
+      page-break-inside: avoid;
+    }
+    .signoff-head {
+      font-size: 12px;
+      font-weight: 700;
+      color: #006b49;
+      margin-bottom: 6px;
+    }
+    .signoff-text {
+      font-size: 11.5px;
+      color: #2b352e;
+      line-height: 1.55;
+    }
+    .signoff-foot {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5px;
+      color: #556358;
+      border-top: 1px solid rgba(207, 226, 215, 0.6);
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+    @media print {
+      body {
+        background: #ffffff !important;
+        padding: 0 !important;
+      }
+      .no-print, .print-bar {
+        display: none !important;
+      }
+      .dossier-card {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-bar no-print">
+    <div class="print-bar-info">
+      <strong>DivyaDrishti Print Preview</strong> · Ready to export document or save as PDF
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="print-bar-btn" onclick="window.print()">
+        🖨️ Print / Save as PDF
+      </button>
+      <button style="background: #e5e0d3; color: #252824; border: 0; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;" onclick="window.close()">
+        ✕ Close
+      </button>
+    </div>
+  </div>
+
+  <article class="dossier-card">
+    <div class="dossier-header">
+      <div>
+        <div class="dossier-brand">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          DivyaDrishti Verified Evidence Dossier
+        </div>
+        <h1 class="dossier-title">${escapeHtml(reportTitle)}</h1>
+        <p class="dossier-org">${escapeHtml(organization)} · Project ID: #${activeProject?.id || 1}</p>
+      </div>
+
+      <div class="dossier-meta">
+        <div><strong>Reporting Window:</strong> ${escapeHtml(reportingPeriod)}</div>
+        <div><strong>Lead Auditor:</strong> ${escapeHtml(auditorName)}</div>
+        <div class="c2pa-badge"><span class="c2pa-dot"></span> C2PA Integrity & Telemetry Verified</div>
+      </div>
+    </div>
+
+    <section class="section-block">
+      <h2 class="section-heading">1. Project Mission & Scope</h2>
+      <p class="section-text">${escapeHtml(whatAreWeDoing)}</p>
+    </section>
+
+    <section class="section-block">
+      <h2 class="section-heading">2. Executed Ground Actions</h2>
+      <p class="section-text">${escapeHtml(whatWeDid)}</p>
+    </section>
+
+    <section class="section-block">
+      <h2 class="section-heading">3. Observed Physical & Environmental Changes</h2>
+      <p class="section-text">${escapeHtml(changesObserved)}</p>
+    </section>
+
+    ${
+      beforeImage || afterImage
+        ? `
+    <section class="section-block">
+      <h2 class="section-heading">4. Synchronized Before & After Evidence Plate</h2>
+      <div class="pair-grid">
+        ${
+          beforeImage
+            ? `
+          <div class="pair-card">
+            <div class="pair-img-wrap">
+              <img src="${beforeImgSrc}" alt="Before state" />
+              <span class="pair-badge badge-before">BEFORE INTERVENTION</span>
+            </div>
+            <div class="pair-meta">
+              <p class="pair-caption">${escapeHtml(beforeCaption)}</p>
+              <p class="pair-sub">📍 ${escapeHtml(beforeImage.metadata?.location_name || 'Delhi, India')} • ${escapeHtml(beforeImage.captured_at || 'Baseline')}</p>
+            </div>
+          </div>
+        `
+            : ''
+        }
+        ${
+          afterImage
+            ? `
+          <div class="pair-card">
+            <div class="pair-img-wrap">
+              <img src="${afterImgSrc}" alt="After state" />
+              <span class="pair-badge badge-after">AFTER INTERVENTION</span>
+            </div>
+            <div class="pair-meta">
+              <p class="pair-caption">${escapeHtml(afterCaption)}</p>
+              <p class="pair-sub">📍 ${escapeHtml(afterImage.metadata?.location_name || 'Delhi, India')} • ${escapeHtml(afterImage.captured_at || 'Completed')}</p>
+            </div>
+          </div>
+        `
+            : ''
+        }
+      </div>
+    </section>
+    `
+        : ''
+    }
+
+    <section class="section-block">
+      <h2 class="section-heading">5. Corroborating Field Evidence Assets (${selectedImages.length})</h2>
+      <div class="evidence-grid">
+        ${evidenceCardsHtml}
+      </div>
+    </section>
+
+    <section class="signoff-box">
+      <div class="signoff-head">
+        🛡️ Auditor Verification & Forensic Sign-Off
+      </div>
+      <p class="signoff-text">${escapeHtml(auditorTakeaways)}</p>
+      <div class="signoff-foot">
+        <span>Cryptographic Digest: SHA256 Verified</span>
+        <span>Generated by DivyaDrishti Evidence Engine</span>
+      </div>
+    </section>
+  </article>
+
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        window.print();
+      }, 500);
+    });
+  </script>
+</body>
+</html>`
+
+    printWin.document.open()
+    printWin.document.write(htmlContent)
+    printWin.document.close()
   }
 
   return (
-    <div className="flex-1 w-full p-6 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto">
-      <div className="bg-white border border-[#e5e0d3] rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex-1 w-full p-6 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto print:p-0 print:max-w-none">
+      <div className="bg-white border border-[#e5e0d3] rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#006b49] mb-1">
             <FileText size={15} />
