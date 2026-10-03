@@ -409,7 +409,7 @@ async def upload_project_image(
         image_id=asset["id"],
         project_id=project_id,
         file_name=stored_filename,
-        is_priority=False
+        is_priority=True
     )
 
     return MediaAssetResponse(**asset)

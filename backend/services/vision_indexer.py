@@ -44,13 +44,22 @@ class VisionIndexer:
         prompt_path: Optional[Union[str, Path]] = None,
         timeout: float = 300.0
     ):
-        self.api_url = (
+        try:
+            from backend.config import GEMMA_INTERNAL_URL
+        except ImportError:
+            try:
+                from config import GEMMA_INTERNAL_URL
+            except ImportError:
+                GEMMA_INTERNAL_URL = None
+
+        raw_url = (
             api_url
             or os.getenv("VISION_API_URL")
-            or os.getenv("EXTERNAL_AI_URL", "").rstrip("/") + "/v1/vision"
-            if os.getenv("EXTERNAL_AI_URL")
-            else "https://ddapi.celi.me/ai/v1/vision"
-        )
+            or GEMMA_INTERNAL_URL
+            or os.getenv("EXTERNAL_AI_URL")
+            or "https://ddapi.celi.me/ai"
+        ).rstrip("/")
+        self.api_url = raw_url if raw_url.endswith("/v1/vision") else f"{raw_url}/v1/vision"
         self.prompt_path = Path(prompt_path) if prompt_path else None
         self.timeout = timeout
         self._prompt_cache: Optional[str] = None

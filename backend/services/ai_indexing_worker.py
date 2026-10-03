@@ -15,7 +15,7 @@ try:
         get_project_indexing_counts,
         get_media_asset_by_id
     )
-    from backend.services.vision_indexer import VisionIndexer, VisionIndexingError
+    from backend.services.vision_indexer import VisionIndexer, VisionIndexingError, DEFAULT_FALLBACK_INDEX
     from backend.services.embedding_service import get_embedding_engine
 except ImportError:
     from config import BUCKETS_DIR, STORAGE_DIR, EXTERNAL_AI_URL
@@ -25,7 +25,7 @@ except ImportError:
         get_project_indexing_counts,
         get_media_asset_by_id
     )
-    from services.vision_indexer import VisionIndexer, VisionIndexingError
+    from services.vision_indexer import VisionIndexer, VisionIndexingError, DEFAULT_FALLBACK_INDEX
     from services.embedding_service import get_embedding_engine
 
 def prepare_compressed_inference_bytes(image_path: Path, max_dimension: int = 1600, quality: int = 82) -> bytes:
@@ -178,6 +178,17 @@ class AIIndexingWorker:
 
         image_path = self._resolve_image_path(project_id, file_name)
         if not image_path:
+            save_image_ai_inference(
+                project_id=project_id,
+                image_id=image_id,
+                ai_data=DEFAULT_FALLBACK_INDEX
+            )
+            await self.broadcast_event({
+                "type": "indexing_failed",
+                "image_id": image_id,
+                "project_id": project_id,
+                "error": "File not found on disk"
+            })
             return
 
         try:

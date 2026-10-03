@@ -19,9 +19,37 @@ import {
   SlidersHorizontal,
   ExternalLink,
   Eye,
-  Maximize2
+  Maximize2,
+  Calendar
 } from 'lucide-react'
 import { searchExplore, batchReindexCrossProject, getMediaUrl } from '../api/media'
+
+function extractDayKey(item) {
+  const rawDate = item.captured_at || item.upload_time
+  if (!rawDate) return 'UNDATED'
+  const str = String(rawDate).trim()
+  if (str.includes(':') && !str.includes('-')) {
+    const parts = str.split(' ')
+    return parts[0].split(':').join('-')
+  }
+  return str.slice(0, 10)
+}
+
+function formatTimelineDate(dayKey) {
+  if (dayKey === 'UNDATED') return 'Undated Field Captures'
+  try {
+    const d = new Date(dayKey + 'T00:00:00')
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    }
+  } catch {}
+  return dayKey
+}
 
 export default function ExploreView({
   projects = [],
@@ -37,7 +65,7 @@ export default function ExploreView({
   const [hideDegraded, setHideDegraded] = useState(false)
   const [sortBy, setSortBy] = useState('relevance')
   const [viewMode, setViewMode] = useState('grid')
-  const [groupBy, setGroupBy] = useState('tim')
+  const [groupBy, setGroupBy] = useState('timeline_day')
 
   const [results, setResults] = useState([])
   const [totalMatches, setTotalMatches] = useState(0)
@@ -379,7 +407,9 @@ export default function ExploreView({
 
     results.forEach((item) => {
       let groupKey = 'Other'
-      if (groupBy === 'tim') {
+      if (groupBy === 'timeline_day') {
+        groupKey = extractDayKey(item)
+      } else if (groupBy === 'tim') {
         groupKey = item.tim ? item.tim.toUpperCase() : 'UNKNOWN TIME'
       } else if (groupBy === 'quality') {
         const label = item.iq_label || 'medium'
@@ -401,6 +431,18 @@ export default function ExploreView({
     })
     return groups
   }, [results, viewMode, groupBy])
+
+  const orderedGroupEntries = React.useMemo(() => {
+    const entries = Object.entries(groupedResults)
+    if (groupBy === 'timeline_day') {
+      return entries.sort((a, b) => {
+        if (a[0] === 'UNDATED') return 1
+        if (b[0] === 'UNDATED') return -1
+        return b[0].localeCompare(a[0])
+      })
+    }
+    return entries
+  }, [groupedResults, groupBy])
 
   const timOptions = [
     { id: 'all', label: 'All Times', count: totalMatches },
@@ -798,8 +840,9 @@ export default function ExploreView({
                 <select
                   value={groupBy}
                   onChange={(e) => setGroupBy(e.target.value)}
-                  className="h-8 px-2.5 rounded-lg border border-[#dfdad0] bg-white text-xs font-medium text-[#006b49] focus:outline-none focus:border-[#006b49]"
+                  className="h-8 px-2.5 rounded-lg border border-[#dfdad0] bg-white text-xs font-semibold text-[#006b49] focus:outline-none focus:border-[#006b49]"
                 >
+                  <option value="timeline_day">Timeline (Daily Captures)</option>
                   <option value="tim">Group by Time of Day</option>
                   <option value="quality">Group by Quality Tier</option>
                   <option value="project">Group by Project</option>
@@ -859,7 +902,7 @@ export default function ExploreView({
           </div>
         ) : viewMode === 'grouped' ? (
           <div className="flex flex-col gap-8">
-            {Object.keys(groupedResults).length === 0 && !loading && (
+            {orderedGroupEntries.length === 0 && !loading && (
               <div className="bg-white border border-[#e7e3da] rounded-2xl p-12 text-center">
                 <Compass className="mx-auto text-[#758076] mb-3" size={36} />
                 <h3 className="text-base font-bold text-[#252824] mb-1">No matches found</h3>
@@ -867,19 +910,75 @@ export default function ExploreView({
               </div>
             )}
 
-            {Object.entries(groupedResults).map(([groupTitle, groupItems]) => (
-              <div key={groupTitle} className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-[#e7e3da]">
-                  <h3 className="text-sm font-bold text-[#252824] tracking-tight">{groupTitle}</h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#f4f3ec] text-[#525c53]">
-                    {groupItems.length} photos
-                  </span>
+            {orderedGroupEntries.map(([groupTitle, groupItems]) => {
+              if (groupBy === 'timeline_day') {
+                const formattedTitle = formatTimelineDate(groupTitle)
+                const uniqueLocations = Array.from(
+                  new Set(groupItems.map((i) => i.location_name).filter(Boolean))
+                )
+                const gpsCount = groupItems.filter(
+                  (i) => i.latitude !== null && i.longitude !== null && !isNaN(i.latitude)
+                ).length
+
+                return (
+                  <div
+                    key={groupTitle}
+                    className="flex flex-col gap-4 bg-white border border-[#e7e3da] rounded-2xl p-5 shadow-xs"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#f0eee6]">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-[#eaf5ee] text-[#006b49] flex items-center justify-center">
+                          <Calendar size={17} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm md:text-base font-bold text-[#252824] tracking-tight">
+                            {formattedTitle}
+                          </h3>
+                          {uniqueLocations.length > 0 && (
+                            <p className="text-[11px] text-[#758076] flex items-center gap-1 mt-0.5">
+                              <MapPin size={11} className="text-[#006b49]" />
+                              <span>
+                                {uniqueLocations.slice(0, 3).join(' · ')}
+                                {uniqueLocations.length > 3 ? ` +${uniqueLocations.length - 3} more sites` : ''}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#eaf5ee] text-[#006b49] border border-[#cbe5d5]">
+                          {groupItems.length} {groupItems.length === 1 ? 'Picture Clicked' : 'Pictures Clicked'}
+                        </span>
+                        {gpsCount > 0 && (
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-[#faf9f5] text-[#525c53] border border-[#dfdad0]">
+                            {gpsCount} Geotagged
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {groupItems.map((item, idx) => renderImageCard(item, idx))}
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+                <div key={groupTitle} className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-[#e7e3da]">
+                    <h3 className="text-sm font-bold text-[#252824] tracking-tight">{groupTitle}</h3>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#f4f3ec] text-[#525c53]">
+                      {groupItems.length} photos
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {groupItems.map((item, idx) => renderImageCard(item, idx))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {groupItems.map((item, idx) => renderImageCard(item, idx))}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <div>
