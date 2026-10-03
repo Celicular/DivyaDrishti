@@ -31,7 +31,7 @@ export default function Footer({ onOpenDeck }) {
         </div>
 
         <div className="footer-bottom">
-          <span>© 2026 DDrishti · Built for Code Cubicle 6.0</span>
+          <span>© 2026 DivyaDrishti (DDrishti) · Field Media Intelligence</span>
           <span>Built by Celi | Himadri Shekhar</span>
           <a
             href="https://github.com/Celicular/DivyaDrishti/blob/main/LICENSE"

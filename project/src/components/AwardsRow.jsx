@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion'
-import { Code2, Cloud, ScanEye, Zap } from 'lucide-react'
+import { Code2, Cloud, ScanEye, Zap, Cpu, MapPin } from 'lucide-react'
 
 const badges = [
-  { title: 'Code Cubicle', detail: '6.0 HACKATHON', img: '/images/code_cubicle_logo.png', color: '#ed7961' },
-  { title: 'Geek Room', detail: 'COMMUNITY', img: '/images/geekroom_logo.webp', color: '#edb955' },
+  { title: 'Evidence Engine', detail: 'MULTIMODAL AI', Icon: Cpu, color: '#ed7961' },
+  { title: 'Geo Telemetry', detail: 'GPS PROVENANCE', Icon: MapPin, color: '#edb955' },
   { title: 'Open source', detail: 'MIT LICENSE', Icon: Code2, color: '#ab79c6' },
   { title: 'Cloudinary', detail: 'MEDIA PIPELINE', Icon: Cloud, color: '#64b795' },
   { title: 'Vision AI', detail: 'MEDIA INSIGHTS', Icon: ScanEye, color: '#7683d4' },

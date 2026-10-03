@@ -26,7 +26,7 @@ def get_secret() -> str:
                         val = clean.split("=", 1)[1].strip()
                         if val:
                             return val
-    return "ddrishti_gemma_secret_hackathon_2026_cc6"
+    return "ddrishti_gemma_secret_key_2026"
 
 if __name__ == "__main__":
     secret = get_secret()

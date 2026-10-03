@@ -4,16 +4,15 @@
 *Turning scattered field photos and videos into verified, audit-ready impact intelligence.*
 
 🚀 **Live Deployment**: [https://ddrishti.celi.me/](https://ddrishti.celi.me/)  
-🏆 **Hackathon**: Built for **Code Cubicle 6.0** | Geek Room  
-🎯 **Themed Track**: **Cloudinary AI Media Intelligence Challenge**  
+🎯 **Focus**: **AI Media Intelligence & Field Evidence Verification**  
 👨‍💻 **Author**: Built by **Celi | Himadri Shekhar**  
 📜 **License**: [MIT](./LICENSE)
 
 ---
 
-## 🎯 The Challenge: Cloudinary Media Intelligence
+## 🎯 Overview: Field Media Intelligence
 
-> **"The challenge is to build an AI-powered media intelligence platform using Cloudinary that can understand field media, organize evidence by project, location, and timeline, and help teams turn visual data into reliable insights and impact stories."**
+> **"An AI-powered media intelligence platform engineered to understand field media, organize evidence by project, location, and timeline, and help organizations turn visual data into reliable insights and impact stories."**
 
 Non-profits, government agencies, disaster responders, and ecological initiatives capture tens of thousands of field photos and video clips across remote project sites. Yet when donors, auditors, or the public ask for proof of work, visual assets remain scattered across phone galleries, chat backups, and unorganized folders.
 
@@ -89,7 +88,7 @@ DDrishti integrates an on-premise multimodal vision inference engine capable of 
   3. **Printable Dossier**: Generates a verified evidence dossier with one-click **Export PDF Report** (`window.print()`).
 
 ### 5. Streamlined Pitch Deck
-- Built-in 5-slide interactive pitch deck accessible directly from the top navigation, summarizing the Cloudinary challenge, ground problem, ingestion pipeline, explore search, and roadmap.
+- Built-in 5-slide interactive pitch deck accessible directly from the top navigation, summarizing the mission, ground problem, ingestion pipeline, explore search, and roadmap.
 
 ---
 

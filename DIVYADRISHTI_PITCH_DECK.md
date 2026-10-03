@@ -1,7 +1,7 @@
 # DivyaDrishti (DDrishti) — Presentation & Product Specification
 
 > **Dynamic Resource for Intelligent Search, Hosting, and Tracking Initiatives**  
-> *Pitch Deck & Architecture Specification for Code Cubicle 6.0 (Geek Room)*  
+> *Product Specification & Architecture Documentation*  
 > **Tagline:** Field Media → Evidence | *"The work already happened. We make it visible."*
 
 ---
@@ -187,7 +187,7 @@ For quick reference against the original presentation deck (`DivyaDrishti final.
 
 | Slide | Section Header | Title / Content Summary |
 | :---: | :--- | :--- |
-| **01** | Cover | **DivyaDrishti (DDrishti)** — Dynamic Resource for Intelligent Search, Hosting, and Tracking Initiatives. Code Cubicle 6.0 \| Geek Room. |
+| **01** | Cover | **DivyaDrishti (DDrishti)** — Dynamic Resource for Intelligent Search, Hosting, and Tracking Initiatives. Field Media Intelligence Platform. |
 | **02** | The Field Reality | *"Thousands of field photos. Zero verifiable structure."* Massive phone and WhatsApp media unorganized without EXIF truth. |
 | **03** | The Problem | *"The evidence exists. Finding and proving it is broken."* Lost GPS/timestamps, manual tagging fatigue, AI synthetic media risks, disconnected audits. |
 | **04** | The Solution | *"Meet DivyaDrishti — Upload once. Understand everything."* Verifiable, geotagged, semantically searchable evidence layer. |
@@ -200,4 +200,4 @@ For quick reference against the original presentation deck (`DivyaDrishti final.
 | **11** | Coming Next: Poster Generation | Up Next: Automated impact posters & campaign creatives, auto-branded visual assets with verified coordinates and badges for social/print. |
 | **12** | Future Roadmap & Research | Unconfirmed exploratory capabilities: Drone orthomosaic stitching with NDVI vegetation health, offline-first field PWA, multi-stakeholder cryptographic sign-off, satellite cross-verification. |
 | **13** | Live Tech Architecture | Built with modern production tech: React 19, Vite, Tailwind CSS, FastAPI, SQLite, local storage buckets, Drishti Vision AI, 384-dim dense embeddings. |
-| **14** | The Mission | *"The work already happened. We make it visible and provable."* Code Cubicle 6.0 \| Geek Room. |
+| **14** | The Mission | *"The work already happened. We make it visible and provable."* DivyaDrishti Field Intelligence. |

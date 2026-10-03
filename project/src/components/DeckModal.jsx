@@ -6,9 +6,9 @@ export default function DeckModal({ initialSlide = 1, onClose }) {
   const slides = [
     {
       num: 1,
-      title: '01 / The Cloudinary Challenge',
+      title: '01 / Mission & Purpose',
       heading: 'AI-Powered Media Intelligence for Field Impact',
-      content: 'We are attempting the Cloudinary-themed project challenge:\n\n"The challenge is to build an AI-powered media intelligence platform using Cloudinary that can understand field media, organize evidence by project, location, and timeline, and help teams turn visual data into reliable insights and impact stories."\n\nMeet DivyaDrishti (DDrishti): Turning raw field media into verifiable evidence that sparks stakeholder trust.',
+      content: 'DivyaDrishti (DDrishti) is an enterprise-grade AI media intelligence and evidence verification platform.\n\nDesigned to understand unstructured field media, organize evidence by project, location, and timeline, and empower organizations to transform raw visual data into verifiable insights and audit-ready impact stories.\n\nFrom remote field operations to donor disclosures: turning ground truth into trusted evidence.',
     },
     {
       num: 2,
